@@ -8,6 +8,7 @@ from flask import Flask, render_template, request, abort, url_for
 from flask_socketio import SocketIO
 import db
 import secrets
+import bcrypt
 
 # import logging
 
@@ -47,7 +48,7 @@ def login_user():
     if user is None:
         return "Error: User does not exist!"
 
-    if user.password != password:
+    if checkpassword(password, user.password) == False:
         return "Error: Password does not match!"
 
     return url_for('home', username=request.json.get("username"))
@@ -56,6 +57,20 @@ def login_user():
 @app.route("/signup")
 def signup():
     return render_template("signup.jinja")
+
+#hashing process for password, bcrypt is used for better security
+def hash(plain_password):
+    #hashes the password while adding a salt simultaneously
+    #need to convert the password first to an array of bytes
+    plain_password = plain_password.encode('utf-8')
+    return bcrypt.hashpw(plain_password, bcrypt.gensalt())
+
+#checks whether the password matches after hashing
+def checkpassword(plain_password, hashed_password):
+    #uses the bcrypt checkpw to check password (returns true or false)
+    #need to convert the password first to an array of bytes
+    plain_password = plain_password.encode('utf-8')
+    return bcrypt.checkpw(plain_password, hashed_password)
 
 # handles a post request when the user clicks the signup button
 @app.route("/signup/user", methods=["POST"])
@@ -66,7 +81,7 @@ def signup_user():
     password = request.json.get("password")
 
     if db.get_user(username) is None:
-        db.insert_user(username, password)
+        db.insert_user(username, hash(password))
         return url_for('home', username=username)
     return "Error: User already exists!"
 
