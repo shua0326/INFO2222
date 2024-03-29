@@ -3,6 +3,7 @@ app.py contains all of the server application
 this is where you'll find all of the get/post request handlers
 the socket event handlers are inside of socket_routes.py
 '''
+from random import random, randint
 
 from flask import Flask, render_template, request, abort, url_for
 from flask_socketio import SocketIO
@@ -77,13 +78,20 @@ def checkpassword(plain_password, hashed_password):
 def signup_user():
     if not request.is_json:
         abort(404)
+
     username = request.json.get("username")
     password = request.json.get("password")
+    id = randint(1000000, 9999999)
+
+    while db.get_id(id) is not None:
+        id = randint(1000000, 9999999)
 
     if db.get_user(username) is None:
-        db.insert_user(username, hash(password))
+        db.insert_user(id, username, hash(password))
         return url_for('home', username=username)
     return "Error: User already exists!"
+
+
 
 # handler when a "404" error happens
 @app.errorhandler(404)
@@ -96,6 +104,8 @@ def home():
     if request.args.get("username") is None:
         abort(404)
     return render_template("home.jinja", username=request.args.get("username"))
+
+#db.add_friend(502592, 9260364)
 
 
 
