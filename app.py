@@ -5,7 +5,7 @@ the socket event handlers are inside of socket_routes.py
 '''
 from random import random, randint
 
-from flask import Flask, render_template, request, abort, url_for
+from flask import Flask, render_template, request, abort, url_for, jsonify
 from flask_socketio import SocketIO
 import db
 import secrets
@@ -56,6 +56,42 @@ def login_user():
         return "Error: Password does not match!"
 
     return url_for('home', username=request.json.get("username"))
+
+@app.route("/api/users/<string:username>/set_public_key", methods=["PUT"])
+def set_public_key(username):
+    data = request.json
+    public_key = data.get('public_key')
+    if not public_key:
+        print("No public key provided")
+        return jsonify({'error': 'Missing public key'}), 400
+
+    user = db.get_user(username)
+    print(user.username)
+    if user is None:
+        print("Error: User does not exist!")
+        return jsonify({'error': 'User not found'}), 404
+
+    db.set_user_public_key(user.id, public_key)
+    print("set")
+    return jsonify({'message': 'Public key updated successfully'}), 200
+
+@app.route("/api/users/<string:username>/get_public_key", methods=["GET"])
+def get_public_key(username):
+    # Retrieve the user from your data store. This could be a database, etc.
+    # This is just a placeholder function. Replace it with your actual user retrieval logic.
+    user = db.get_user(username)
+
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    # Assuming the user object has a 'public_key' attribute where the public key is stored
+    public_key = user.pubkey
+
+    if not public_key:
+        return jsonify({'error': 'Public key not found for user'}), 404
+
+    # Return the public key in the expected field 'pubkey'
+    return jsonify({'pubkey': public_key}), 200
 
 # handles a get request to the signup page
 @app.route("/signup")

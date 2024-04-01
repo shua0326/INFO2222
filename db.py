@@ -73,6 +73,12 @@ def friend_list(user_id: int):
         else:
             print(f"{user.username} has no friends.")
 
+def set_user_public_key(user_id, public_key):
+    with Session(engine) as session:
+        user = session.query(User).filter(User.id == user_id).first()
+        user.pubkey = public_key
+        session.commit()
+
 #hashing process for password, bcrypt is used for better security
 def hash(plain_password):
     #hashes the password while adding a salt simultaneously
@@ -97,6 +103,11 @@ def format_username(username):
 def format_password(password):
     password = password.strip()
     return password
+
+def get_user_public_key(user_id):
+    with Session(engine) as session:
+        user = session.query(User).get(user_id)
+        return user.public_key if user else None
 
 def get_id(id: int):
     with Session(engine) as session:
