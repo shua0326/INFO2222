@@ -9,7 +9,6 @@ from flask import Flask, render_template, request, abort, url_for
 from flask_socketio import SocketIO
 import db
 import secrets
-import bcrypt
 
 # import logging
 
@@ -45,11 +44,15 @@ def login_user():
     username = request.json.get("username")
     password = request.json.get("password")
 
-    user =  db.get_user(username)
+    #ensures the case is not a factor for the username and removes accidental spaces in the username or password
+    username = db.format_username(username)
+    password = db.format_password(password)
+
+    user = db.get_user(username)
     if user is None:
         return "Error: User does not exist!"
 
-    if checkpassword(password, user.password) == False:
+    if db.checkpassword(password, user.password) == False:
         return "Error: Password does not match!"
 
     return url_for('home', username=request.json.get("username"))
@@ -59,20 +62,6 @@ def login_user():
 def signup():
     return render_template("signup.jinja")
 
-#hashing process for password, bcrypt is used for better security
-def hash(plain_password):
-    #hashes the password while adding a salt simultaneously
-    #need to convert the password first to an array of bytes
-    plain_password = plain_password.encode('utf-8')
-    return bcrypt.hashpw(plain_password, bcrypt.gensalt())
-
-#checks whether the password matches after hashing
-def checkpassword(plain_password, hashed_password):
-    #uses the bcrypt checkpw to check password (returns true or false)
-    #need to convert the password first to an array of bytes
-    plain_password = plain_password.encode('utf-8')
-    return bcrypt.checkpw(plain_password, hashed_password)
-
 # handles a post request when the user clicks the signup button
 @app.route("/signup/user", methods=["POST"])
 def signup_user():
@@ -81,13 +70,17 @@ def signup_user():
 
     username = request.json.get("username")
     password = request.json.get("password")
+    #creates a unique id for the friends association table to function
     id = randint(1000000, 9999999)
-
     while db.get_id(id) is not None:
         id = randint(1000000, 9999999)
 
+    #ensures the case is not a factor for the username and removes accidental spaces in the username or password
+    username = db.format_username(username)
+    password = db.format_password(password)
+
     if db.get_user(username) is None:
-        db.insert_user(id, username, hash(password))
+        db.insert_user(username, id, db.hash(password))
         return url_for('home', username=username)
     return "Error: User already exists!"
 
@@ -105,7 +98,7 @@ def home():
         abort(404)
     return render_template("home.jinja", username=request.args.get("username"))
 
-#db.add_friend(502592, 9260364)
+
 
 
 
