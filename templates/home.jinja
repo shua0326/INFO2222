@@ -105,13 +105,17 @@
     const socket = io();
 
     // an incoming message arrives, we'll add the message to the message box
-    socket.on("incoming", (encryptedMsg) => {
-        userPrivateKey = getPrivateKey();
-        decryptMessage(userPrivateKey, encryptedMsg)
+    socket.on("incoming", (username, encryptedMsg) => {
+        decryptMessage(encryptedMsg)
             .then(decryptedMessage => {
-                add_message(decryptedMessage);
+                add_message(username + decryptedMessage);
             });
     });
+
+    socket.on("incoming_sys", (msg, color="black") => {
+        add_message(msg, color);
+    })
+
 
     const dbName = "cryptoKeysDB";
     const storeName = "keys";
@@ -215,8 +219,6 @@
             throw new Error('Private key not found');
         }
 
-        console.log('Encrypted Message Base64:', encryptedMessageBase64);
-
         if (!encryptedMessageBase64) {
             console.error('Encrypted message is undefined or null');
             throw new Error('Encrypted message is undefined or null');
@@ -228,6 +230,8 @@
         // Handle URL-safe Base64 and padding
         const safeBase64 = encryptedMessageBase64.replace(/-/g, '+').replace(/_/g, '/').replace(/\s/g, '');
         const paddedBase64 = safeBase64.padEnd(Math.ceil(safeBase64.length / 4) * 4, '=');
+
+        console.log('Encrypted Message Base64:', encryptedMessageBase64);
 
         let encryptedMessageBuffer;
         try {
@@ -276,7 +280,7 @@
                 console.error("No public key found for receiver:", receiver);
                 return;  // Exit the function if no public key was fetched
             }
-
+        add_message(username + ": " + message)
             const encryptedMessage = await encryptMessage(receiverPublicKey, message);
             socket.emit("send", username, encryptedMessage, room_id);
         } catch (error) {
