@@ -3,12 +3,12 @@ app.py contains all of the server application
 this is where you'll find all of the get/post request handlers
 the socket event handlers are inside of socket_routes.py
 '''
+from random import random, randint
 
-from flask import Flask, render_template, request, abort, url_for
+from flask import Flask, render_template, request, abort, url_for, jsonify
 from flask_socketio import SocketIO
 import db
 import secrets
-import bcrypt
 
 # import logging
 
@@ -44,46 +44,83 @@ def login_user():
     username = request.json.get("username")
     password = request.json.get("password")
 
-    user =  db.get_user(username)
+    #ensures the case is not a factor for the username and removes accidental spaces in the username or password
+    username = db.format_username(username)
+    password = db.format_password(password)
+
+    user = db.get_user(username)
     if user is None:
         return "Error: User does not exist!"
 
-    if checkpassword(password, user.password) == False:
+    if db.checkpassword(password, user.password) == False:
         return "Error: Password does not match!"
 
     return url_for('home', username=request.json.get("username"))
+
+@app.route("/api/users/<string:username>/set_public_key", methods=["PUT"])
+def set_public_key(username):
+    data = request.json
+    public_key = data.get('public_key')
+    if not public_key:
+        print("No public key provided")
+        return jsonify({'error': 'Missing public key'}), 400
+
+    user = db.get_user(username)
+    print(user.username)
+    if user is None:
+        print("Error: User does not exist!")
+        return jsonify({'error': 'User not found'}), 404
+
+    db.set_user_public_key(user.id, public_key)
+    print("set")
+    return jsonify({'message': 'Public key updated successfully'}), 200
+
+@app.route("/api/users/<string:username>/get_public_key", methods=["GET"])
+def get_public_key(username):
+    # Retrieve the user from your data store. This could be a database, etc.
+    # This is just a placeholder function. Replace it with your actual user retrieval logic.
+    user = db.get_user(username)
+
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    # Assuming the user object has a 'public_key' attribute where the public key is stored
+    public_key = user.pubkey
+
+    if not public_key:
+        return jsonify({'error': 'Public key not found for user'}), 404
+
+    # Return the public key in the expected field 'pubkey'
+    return jsonify({'pubkey': public_key}), 200
 
 # handles a get request to the signup page
 @app.route("/signup")
 def signup():
     return render_template("signup.jinja")
 
-#hashing process for password, bcrypt is used for better security
-def hash(plain_password):
-    #hashes the password while adding a salt simultaneously
-    #need to convert the password first to an array of bytes
-    plain_password = plain_password.encode('utf-8')
-    return bcrypt.hashpw(plain_password, bcrypt.gensalt())
-
-#checks whether the password matches after hashing
-def checkpassword(plain_password, hashed_password):
-    #uses the bcrypt checkpw to check password (returns true or false)
-    #need to convert the password first to an array of bytes
-    plain_password = plain_password.encode('utf-8')
-    return bcrypt.checkpw(plain_password, hashed_password)
-
 # handles a post request when the user clicks the signup button
 @app.route("/signup/user", methods=["POST"])
 def signup_user():
     if not request.is_json:
         abort(404)
+
     username = request.json.get("username")
     password = request.json.get("password")
+    #creates a unique id for the friends association table to function
+    id = randint(1000000, 9999999)
+    while db.get_id(id) is not None:
+        id = randint(1000000, 9999999)
+
+    #ensures the case is not a factor for the username and removes accidental spaces in the username or password
+    username = db.format_username(username)
+    password = db.format_password(password)
 
     if db.get_user(username) is None:
-        db.insert_user(username, hash(password))
+        db.insert_user(username, id, db.hash(password))
         return url_for('home', username=username)
     return "Error: User already exists!"
+
+
 
 # handler when a "404" error happens
 @app.errorhandler(404)
@@ -96,6 +133,8 @@ def home():
     if request.args.get("username") is None:
         abort(404)
     return render_template("home.jinja", username=request.args.get("username"))
+
+
 
 
 

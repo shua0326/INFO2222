@@ -29,7 +29,7 @@ def connect():
     # socket automatically leaves a room on client disconnect
     # so on client connect, the room needs to be rejoined
     join_room(int(room_id))
-    emit("incoming", (f"{username} has connected", "green"), to=int(room_id))
+    emit("incoming_sys", (f"{username} has connected", "green"), to=int(room_id))
 
 # event when client disconnects
 # quite unreliable use sparingly
@@ -39,12 +39,14 @@ def disconnect():
     room_id = request.cookies.get("room_id")
     if room_id is None or username is None:
         return
-    emit("incoming", (f"{username} has disconnected", "red"), to=int(room_id))
+    emit("incoming_sys", (f"{username} has disconnected", "red"), to=int(room_id))
+    leave_room(room_id)
+    room.leave_room(username)
 
 # send message event handler
 @socketio.on("send")
 def send(username, message, room_id):
-    emit("incoming", (f"{username}: {message}"), to=room_id)
+    emit("incoming", (f"{username}: ", f"{message}"), to=room_id)
     
 # join room event handler
 # sent when the user joins a room
@@ -67,9 +69,9 @@ def join(sender_name, receiver_name):
         room.join_room(sender_name, room_id)
         join_room(room_id)
         # emit to everyone in the room except the sender
-        emit("incoming", (f"{sender_name} has joined the room.", "green"), to=room_id, include_self=False)
+        emit("incoming_sys", (f"{sender_name} has joined the room.", "green"), to=room_id, include_self=False)
         # emit only to the sender
-        emit("incoming", (f"{sender_name} has joined the room. Now talking to {receiver_name}.", "green"))
+        emit("incoming_sys", (f"{sender_name} has joined the room. Now talking to {receiver_name}.", "green"))
         return room_id
 
     # if the user isn't inside of any room, 
@@ -77,7 +79,7 @@ def join(sender_name, receiver_name):
     # or is simply a new user looking to chat with someone
     room_id = room.create_room(sender_name, receiver_name)
     join_room(room_id)
-    emit("incoming", (f"{sender_name} has joined the room. Now talking to {receiver_name}.", "green"), to=room_id)
+    emit("incoming_sys", (f"{sender_name} has joined the room. Now talking to {receiver_name}.", "green"), to=room_id)
     return room_id
 
 # leave room event handler

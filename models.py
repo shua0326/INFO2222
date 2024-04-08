@@ -10,13 +10,23 @@ Prisma docs also looks so much better in comparison
 or use SQLite, if you're not into fancy ORMs (but be mindful of Injection attacks :) )
 '''
 
-from sqlalchemy import String
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy import String, Integer, Table, ForeignKey, Column, create_engine
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, declarative_base, relationship, Session
 from typing import Dict
 
 # data models
-class Base(DeclarativeBase):
-    pass
+#defining the base class using declarative_base
+Base = declarative_base()
+
+#defining an association table to create the friends list
+
+friends_association = Table(
+    'friends_association', Base.metadata,
+    Column('user_id', Integer, ForeignKey('user.id'), primary_key=True),
+    Column('friend_id', Integer, ForeignKey('user.id'), primary_key=True)
+)
+
+
 
 # model to store user information
 class User(Base):
@@ -27,9 +37,18 @@ class User(Base):
     # and I want this column to be my primary key
     # then accessing john.username -> will give me some data of type string
     # in other words we've mapped the username Python object property to an SQL column of type String 
-    username: Mapped[str] = mapped_column(String, primary_key=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    username: Mapped[str] = mapped_column(String, unique=True)
     password: Mapped[str] = mapped_column(String)
-    
+    pubkey: Mapped[str] = Column(String)
+
+
+
+    friends = relationship("User",
+                           secondary=friends_association,
+                           primaryjoin=id == friends_association.c.user_id,
+                           secondaryjoin=id == friends_association.c.friend_id)
+                           
 
 # stateful counter used to generate the room id
 class Counter():
