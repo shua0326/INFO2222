@@ -5,7 +5,7 @@ the socket event handlers are inside of socket_routes.py
 '''
 from random import random, randint
 
-from flask import Flask, render_template, request, abort, url_for, jsonify
+from flask import Flask, render_template, request, abort, url_for, jsonify, session, redirect
 from flask_socketio import SocketIO
 import db
 import secrets
@@ -131,10 +131,15 @@ def page_not_found(_):
 @app.route("/home")
 def home():
     if request.args.get("username") is None:
-        abort(404)
+        abort(404)    
     return render_template("home.jinja", username=request.args.get("username"))
 
-
+@app.route('/logout')
+def logout():
+    # Remove the username from the session if it's there
+    session.pop('username', None)
+    # Redirect to the index page
+    return redirect(url_for('index'))
 
 
 

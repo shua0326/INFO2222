@@ -5,59 +5,147 @@
 
 
 {% block content %} 
-   <style>
-    nav {
-        border-bottom: 1px solid black;
-        overflow: auto
+<style>
+    
+    body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        background-color: #f4f4f4;
     }
-
+    
+    .main {
+        display: flex;
+        justify-content: space-around;
+        margin: 20px;
+    }
+    
+    .Chat {
+        flex: 5; /* Takes up 3/4 of the space */
+        margin-right: 20px;
+        background-color: #fff;
+        padding: 20px;
+        border-radius: 5px;
+        box-shadow: 0px 0px 5px 0px rgba(0,0,0,0.15);
+    }
+    
+    .Friends {
+        flex: 1; /* Takes up 1/4 of the space */
+        background-color: #fff;
+        padding: 20px;
+        border-radius: 5px;
+        box-shadow: 0px 0px 5px 0px rgba(0,0,0,0.15);
+    }
+    
     #message_box {
-        border: 1px solid black; 
-        height: 400px; 
-        width: 800px; 
+        border: 1px solid #ddd;
+        height: 400px;
+        width: 100%;
         overflow: auto;
-        padding: 2px;
+        padding: 10px;
+        margin-bottom: 20px;
+        border-radius: 5px;
+    }
+    
+    .text {
+        margin: 5px 0;
+    }
+    
+    nav {
+        display: flex;
+        justify-content: flex-end;
+        background-color: #333;
+        color: #fff;
+        padding: 0.2em 1em;
+        font-size: 1.5em;
+    }
+    
+    button {
+        background-color: #f44336; 
+        border: none;
+        color: white;
+        padding: 10px 10px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 16px;
+        cursor: pointer;
+        border-radius: 4px;
     }
 
-    .text  {
-        margin-top: 2px;
-        margin-bottom: 2px;
+    button:hover {
+        background-color: #d32f2f; 
+        color: #fff;
     }
+
+    .receiver {
+        font-size: 16px;
+        padding: 10px;
+    }
+    
+    h1 {
+        text-align: left;
+        padding-left: 20px;
+        color: blue;
+        margin: 20px 0;
+    }
+
+    nav ol li {
+        display: inline-block;
+        margin-right: 20px;
+    }
+
 
 </style>
 
 <!--Navbar, you'll see the username here-->
-<nav style="border-bottom: 1px solid black;">
-    <ol style="float: right">
-        <li style="display:inline-block">Username:  {{ username }} </li>
+<nav>
+    <ol>
+        <li><b>Username:</b>  {{ username }} </li>
+        <li><button onclick="logout()">Logout</button></li>
     </ol>
 </nav>
 
 <h1>Messaging App </h1>
+<main class="main">
+    
+    <div class="Chat section">
+        <!-- The messages are displayed here -->
+        <section id="message_box"></section>
 
-<main>
-    <!-- The messages are displayed here -->
-    <section id="message_box"></section>
+        <!-- These part ideally should be a form element, 
+        but I wrote this code a year ago and I don't want to break anything...-->
+        <section id="chat_box">
+            <p class="text">Chat with: </p>
+            <input class="receiver" placeholder="username">
+            <!-- MDN says its bad practice to use the onclick attribute,
+            but we're using it anyways coz its easy :)-->
+            <button onclick="join_room()">Chat</button>
+        </section>
 
-    <!-- These part ideally should be a form element, 
-    but I wrote this code a year ago and I don't want to break anything...-->
-    <section id="chat_box">
-        <p class="text">Chat with: </p>
-        <input id="receiver" placeholder="username">
-        <!-- MDN says its bad practice to use the onclick attribute,
-        but we're using it anyways coz its easy :)-->
-        <button onclick="join_room()">Chat</button>
-    </section>
+        <!-- The (message) input box is set to display: none initially, 
+        this means the input box is "invisible" initially-->
+        <section id="input_box" style="display: none" >
+            <p class="text">Message: </p>
+            <input id="message" placeholder="message">
+            <button onclick="send()">Send</button>
+            <button onclick="leave()">Leave Room</button>
+        </section>
+    </div>
 
-    <!-- The (message) input box is set to display: none initially, 
-    this means the input box is "invisible" initially-->
-    <section id="input_box" style="display: none" >
-        <p class="text">Message: </p>
-        <input id="message" placeholder="message">
-        <button onclick="send()">Send</button>
-        <button onclick="leave()">Leave Room</button>
-    </section>
+    <div class="Friends list section">  
+        <h2>Friends List</h2>
+        <ul>
+            <li>Friend 1</li>
+            <li>Friend 2</li>
+            <li>Friend 3</li>
+            <li>Friend 4</li>
+            <li>Friend 5</li>
+        </ul>
+    </div>
+
 </main>
+
 
 <script src="/static/js/libs/socket.io.min.js"></script>
 <script>
@@ -113,7 +201,9 @@
     });
 
     socket.on("incoming_sys", (msg, color="black") => {
+        console.log("hi");
         add_message(msg, color);
+        console.log("success");
     })
 
 
@@ -329,6 +419,12 @@
         let box = $("#message_box");
         let child = $(`<p style="color:${color}; margin: 0px;"></p>`).text(message);
         box.append(child);
+    }
+
+    // Logout function
+    function logout() {
+        // Redirect to the logout route
+        window.location.href = "/logout";
     }
     
 </script>

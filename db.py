@@ -55,23 +55,24 @@ def add_friend(user_id: int, friend_id: int):
         session.commit()
 
 #shows the friends list of some user, change later to display it in the frontend
-def friend_list(user_id: int):
+def get_friends(user_id: int):
     # Create a new session
     with Session(engine) as session:
         # Retrieve the user from the database
         user = session.get(User, user_id)
-
+        string_to_send = ""
         if not user:
-            print("User not found.")
-            return
+            string_to_send += "User not found."
+            return string_to_send
 
         # Check if the user has friends
         if user.friends:
-            print(f"Friends of {user.username}:")
+            string_to_send += f"Friends of {user.username}:"
             for friend in user.friends:
-                print(f"- {friend.username}")
+                string_to_send += f"\n- {friend.username}"
         else:
-            print(f"{user.username} has no friends.")
+            string_to_send += f"{user.username} has no friends."
+        return string_to_send
 
 def set_user_public_key(user_id, public_key):
     with Session(engine) as session:
@@ -103,6 +104,13 @@ def format_username(username):
 def format_password(password):
     password = password.strip()
     return password
+
+
+# Get user id function
+def get_user_id(user_name):
+    with Session(engine) as session:
+        user = session.query(User).get(user_name)
+        return user.user_id if user else None 
 
 def get_user_public_key(user_id):
     with Session(engine) as session:

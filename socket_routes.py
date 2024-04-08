@@ -6,6 +6,8 @@ file containing all the routes related to socket.io
 
 from flask_socketio import join_room, emit, leave_room
 from flask import request
+from sqlalchemy.orm import Session
+from sqlalchemy import create_engine
 
 try:
     from __main__ import socketio
@@ -17,6 +19,7 @@ from models import Room
 import db
 
 room = Room()
+engine = create_engine("sqlite:///database/main.db", echo=True)
 
 # when the client connects to a socket
 # this event is emitted when the io() function is called in JS
@@ -24,6 +27,9 @@ room = Room()
 def connect():
     username = request.cookies.get("username")
     room_id = request.cookies.get("room_id")
+    #user_id = db.get_user_id(username)
+    #friends = db.get_friends(user_id)
+    
     if room_id is None or username is None:
         return
     # socket automatically leaves a room on client disconnect
