@@ -109,7 +109,7 @@
 <h1>Messaging App </h1>
 <main class="main">
     
-    <div class="Chat section">
+    <div class="Chat">
         <!-- The messages are displayed here -->
         <section id="message_box"></section>
 
@@ -117,7 +117,7 @@
         but I wrote this code a year ago and I don't want to break anything...-->
         <section id="chat_box">
             <p class="text">Chat with: </p>
-            <input class="receiver" placeholder="username">
+            <input class="receiver" id="receiver" placeholder="username">
             <!-- MDN says its bad practice to use the onclick attribute,
             but we're using it anyways coz its easy :)-->
             <button onclick="join_room()">Chat</button>
@@ -133,7 +133,7 @@
         </section>
     </div>
 
-    <div class="Friends list section">  
+    <div class="Friends">  
         <h2>Friends List</h2>
         <ul>
             <li>Friend 1</li>
@@ -202,7 +202,7 @@
 
     socket.on("incoming_sys", (msg, color="black") => {
         console.log("hi");
-        add_message(msg, color);
+        add_message(friends + msg, color);
         console.log("success");
     })
 
