@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "js-crypto-hmac": "^1.0.7"
+  }
+}

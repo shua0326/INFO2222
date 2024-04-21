@@ -2,7 +2,9 @@
 db
 database file, containing all the logic to interface with the sql database
 '''
-from sqlalchemy import create_engine
+
+
+from sqlalchemy import create_engine, update, select, and_
 from sqlalchemy.orm import Session
 from models import *
 import bcrypt
@@ -33,6 +35,11 @@ def get_user(username: str):
         user = session.query(User).filter_by(username=username).first()
         return user
 
+def get_username(user_id: int):
+    with Session(engine) as session:
+        user = session.query(User).filter_by(id=user_id).first()
+        return user.username
+
 def add_friend(user_id: int, friend_id: int):
     # Create a new session
     with Session(engine) as session:
@@ -53,6 +60,23 @@ def add_friend(user_id: int, friend_id: int):
 
         # Commit the transaction to save changes to the database
         session.commit()
+        
+def add_friend_request(user_id: int, friend_id: int):
+    # Create a new session
+    with Session(engine) as session:
+        # Retrieve the user and the friend from the database
+        user = session.get(User, user_id)
+        friend = session.get(User, friend_id)
+
+        if not user or not friend or user_id == friend_id:
+            print("User or friend not found.")
+            return
+        # Add the friend to the user's list of friends
+        # This establishes the friendship in one direction
+        user.friends_request.append(friend)
+        #this creates the mutual relationship, change later to make this only occur on accepting friend request
+        # Commit the transaction to save changes to the database
+        session.commit()
 
 #shows the friends list of some user, change later to display it in the frontend
 def get_friends(user_id: int):
@@ -60,22 +84,117 @@ def get_friends(user_id: int):
     with Session(engine) as session:
         # Retrieve the user from the database
         user = session.get(User, user_id)
-        string_to_send = ""
+        list_to_send = []
         if not user:
-            string_to_send += "User not found."
-            return string_to_send
-
+            return list_to_send
         # Check if the user has friends
         if user.friends:
-            string_to_send += f"Friends of {user.username}:"
             for friend in user.friends:
-                string_to_send += f"\n- {friend.username}"
+                list_to_send.append(friend.username)
+        return list_to_send
+    
+def remove_friend(user_id, friend_id):
+    with Session(engine) as session:
+        # Get the user and friend from the database
+        user = session.get(User, user_id)
+        friend = session.get(User, friend_id)
+
+        if not user or not friend:
+            print("User or friend not found.")
+            return
+
+        # Remove the friend from the user's list of friends
+        # This breaks the friendship in one direction
+        user.friends.remove(friend)
+        #this removes the mutual relationship, change later to make this only occur on accepting friend request
+        friend.friends.remove(user)
+        # Commit the transaction to save changes to the database
+        session.commit()
+    
+def remove_request(friend_id, user_id):
+    with Session(engine) as session:
+        # Get the user and friend from the database
+        stmt = friends_request.delete().where(
+            and_(
+                friends_request.c.user_id == user_id,
+                friends_request.c.friend_id == friend_id
+            )
+        )
+        session.execute(stmt)
+        session.commit()
+        
+
+#shows the friends list of some user, change later to display it in the frontend
+def get_incoming_friends_request(user_id: int):
+    # Create a new session
+    with Session(engine) as session:
+        # Query the friends_request table
+        stmt = select(friends_request.c.user_id).where(friends_request.c.friend_id == user_id)
+        result = session.execute(stmt)
+        friend_request_ids = [row[0] for row in result.fetchall()]
+        stmt = select(User.username).where(User.id.in_(friend_request_ids))
+        user_names = session.execute(stmt)
+        user_names_lst = [row[0] for row in user_names.fetchall()]
+        return user_names_lst
+    
+def get_outgoing_friends_request(user_id: int):
+    # Create a new session
+    with Session(engine) as session:
+        # Retrieve the user from the database
+        user = session.get(User, user_id)
+        list_to_send = []
+        if not user:
+            return list_to_send
+        # Check if the user has friends
+        if user.friends_request:
+            friendnames = session.query(User).filter(User.id == user_id).one()
+            friends_names = friendnames.friends_request
+            for i in friends_names:
+                if i.id != user_id:
+                    list_to_send.append(i.username)
+        return list_to_send
+
+def update_convo(convo_id, encrypted_message1, encrypted_message2, hmac):
+    with Session(engine) as session:
+        result = session.query(Message).filter(Message.convo_id == convo_id).one_or_none()
+        if result:
+            # If the convo_id exists, update the message
+            result.encryptedconvo1 += "+++" + encrypted_message1
+            result.encryptedconvo2 += "+++" + encrypted_message2
+            result.hmac = hmac
         else:
-            string_to_send += f"{user.username} has no friends."
-        return string_to_send
+            # If the convo_id does not exist, insert a new record
+            new_message = Message(convo_id=convo_id, encryptedconvo1=encrypted_message1, encryptedconvo2=encrypted_message2, hmac=hmac)
+            session.add(new_message)
+        session.commit()
+
+def get_convo(convo_id, row):
+    with Session(engine) as session:
+        result = session.query(Message).filter(Message.convo_id == convo_id).one_or_none()
+        if result:
+            if row == "encryptedconvo1":
+                return result.encryptedconvo1
+            elif row == "encryptedconvo2":
+                return result.encryptedconvo2
+        else:
+            return None
+
+def get_hmac(convo_id):
+    with Session(engine) as session:
+        result = session.query(Message).filter(Message.convo_id == convo_id).one_or_none()
+        if result:
+            return result.hmac
+        else:
+            return None
+
+def generate_convo_id(user_id1, user_id2):
+    return f"{min(user_id1, user_id2)}{max(user_id1, user_id2)}"
 
 def set_user_public_key(user_id, public_key):
     with Session(engine) as session:
+        print()
+        print("Setting public key for user_id:", user_id)
+        print()
         user = session.query(User).filter(User.id == user_id).first()
         user.pubkey = public_key
         session.commit()
@@ -107,15 +226,14 @@ def format_password(password):
 
 
 # Get user id function
-def get_user_id(user_name):
-    with Session(engine) as session:
-        user = session.query(User).get(user_name)
-        return user.user_id if user else None 
+def get_user_id(username):
+    user = get_user(username)
+    return user.id if user else None
 
 def get_user_public_key(user_id):
     with Session(engine) as session:
         user = session.query(User).get(user_id)
-        return user.public_key if user else None
+        return user.pubkey if user else None
 
 def get_id(id: int):
     with Session(engine) as session:

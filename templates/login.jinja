@@ -11,7 +11,6 @@
     <p>Password</p>
     <input id="password"  type="password"/>
     <button onclick="login()">Login</button>
-
     <script>
 
         // basically checks if the server returns an Error message instead of a URL
@@ -33,27 +32,43 @@
             // you know the one with the:
             // app.route("/login/user", methods=["POST"])
             // login_user()
-            // so... "{{ url_for('login_user')}}" 
+            // so... "{{ url_for('login_the_user')}}"
             // gives us -> "http://blabla/login/user"
-            let loginURL = "{{ url_for('login_user') }}";
+            let loginURL = "{{ url_for('login_the_user') }}";
+
+            let password = $("#password").val();
+            password = password.replace(/\s/g, '');
+            password = password.hashCode();
+
 
             // axios post is a fancy way of posting a request to the server,
             // we pass in the username and password here
             let res = await axios.post(loginURL, {
                 username: $("#username").val(),
-                password: $("#password").val()
+                password: password
             });
+
 
             // if the server sends in an error message, alert() the error message
             if (!isValidURL(res.data)) {
                 alert(res.data);
                 return;
             }
-
+            var revpas = $("#password").val();
+            var user = $("#username").val();
             // redirects to the URL (ie. res.data),
             // we use _self here since we all hate that moment
             // when the browser opens a new tab
+
+            //const privkey = getPrivateKey();
+            var passphrase = revpas + user;
+            //passphrase = String(passphrase.hashCode());
+            const privkey = cryptico.generateRSAKey(passphrase, 2048);
+            const serial_privkey = exportRSAKey(privkey);
+            await storeRSAKey(serial_privkey, passphrase);
+            await addData(passphrase);
             window.open(res.data, "_self")
         }
+
     </script>
 {% endblock %}

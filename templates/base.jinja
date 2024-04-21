@@ -15,9 +15,206 @@ Yeah I know it's pretty ugly...
         <script src="/static/js/libs/axios.min.js"></script>
         <script src="/static/js/libs/jquery.min.js"></script>
         <script src="/static/js/libs/js.cookie.min.js"></script>
+        <script src="/static/js/libs/cryptico.min.js"></script>
     </head>
     <body>
         <!-- The content from any other page goes here -->
         {% block content %} {% endblock %}
     </body>
 </html>
+
+<script src="/static/js/libs/socket.io.min.js"></script>
+<script>
+    const dbName = "cryptoKeysDB";
+    const storeName = "keys";
+    String.prototype.hashCode = function() {
+      var hash = 0,
+        i, chr;
+      if (this.length === 0) return hash;
+      for (i = 0; i < this.length; i++) {
+        chr = this.charCodeAt(i);
+        hash = ((hash << 5) - hash) + chr;
+        hash |= 0; // Convert to 32bit integer
+      }
+      return hash;
+    }
+
+    function initDB() {
+        return new Promise((resolve, reject) => {
+            const openRequest = indexedDB.open(dbName, 1);
+
+            openRequest.onupgradeneeded = function(event) {
+                const db = event.target.result;
+                db.createObjectStore(storeName, { keyPath: "id" });
+            };
+
+            openRequest.onsuccess = function(event) {
+                resolve(event.target.result);
+            };
+
+            openRequest.onerror = function(event) {
+                console.error("IndexedDB error:", openRequest.error);
+                reject(openRequest.error);
+            };
+        });
+    }
+
+    function storeRSAKey(serializedKey, keyId) {
+        return new Promise((resolve, reject) => {
+            initDB().then(db => {
+                const transaction = db.transaction([storeName], "readwrite");
+                const store = transaction.objectStore(storeName);
+
+                const request = store.put({ id: keyId, key: serializedKey });
+
+                request.onsuccess = () => resolve("Key stored successfully.");
+                request.onerror = () => reject("Failed to store key.");
+            }).catch(reject);
+        });
+    }
+
+    function importRSAKey(serializedKey) {
+        var keyObj = JSON.parse(serializedKey);
+        var rsaKey = new RSAKey();
+        rsaKey.setPrivateEx(
+            keyObj.n, // modulus
+            keyObj.e, // publicExponent
+            keyObj.d, // privateExponent
+            keyObj.p, // prime1
+            keyObj.q, // prime2
+            keyObj.dmp1, // exponent1
+            keyObj.dmq1, // exponent2
+            keyObj.coeff // coefficient
+        );
+        return rsaKey;
+    }
+
+    function exportRSAKey(key) {
+        return JSON.stringify({
+            n: key.n.toString(16),    // modulus
+            e: key.e.toString(16),    // public exponent
+            d: key.d.toString(16),    // private exponent
+            p: key.p.toString(16),    // prime1
+            q: key.q.toString(16),    // prime2
+            dmp1: key.dmp1.toString(16), // exponent1
+            dmq1: key.dmq1.toString(16), // exponent2
+            coeff: key.coeff.toString(16) // coefficient
+        });
+    }
+
+    function getRSAKey(keyId) {
+        return new Promise((resolve, reject) => {
+            initDB().then(db => {
+                const transaction = db.transaction([storeName], "readonly");
+                const store = transaction.objectStore(storeName);
+
+                const request = store.get(keyId);
+
+                request.onsuccess = () => {
+                    if (request.result) {
+                        resolve(request.result.key);
+                    } else {
+                        reject("No key found with the given ID.");
+                    }
+                };
+                request.onerror = () => reject("Failed to retrieve key.");
+            }).catch(reject);
+        });
+    }
+
+    async function addData(passphrase) {
+        const db = await initDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction([storeName], "readwrite");
+            const objectStore = transaction.objectStore(storeName);
+
+            const request = objectStore.put({ id: 'Passphrase', key: passphrase });
+
+            request.onsuccess = () => {
+              resolve("Data added successfully");
+            };
+
+            request.onerror = (event) => {
+              reject("Add data error: " + event.target.error);
+            };
+        });
+}
+
+    async function getData() {
+        const db = await initDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction([storeName], "readonly");
+            const objectStore = transaction.objectStore(storeName);
+
+            const request = objectStore.get('Passphrase');
+
+            request.onsuccess = () => {
+              if (request.result) {
+                resolve(request.result.key);
+              } else {
+                resolve("No data found with the given key");
+              }
+            };
+
+            request.onerror = (event) => {
+              reject("Get data error: " + event.target.error);
+            };
+        });
+    }
+
+    async function getPrivateKey() {
+    const db = await initDB(); // Assume initDB initializes and opens your IndexedDB
+
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction([storeName], 'readonly');
+        const store = transaction.objectStore(storeName);
+        const request = store.get('RSAKey');
+
+        request.onsuccess = (event) => {
+            if (event.target.result) {
+                resolve(event.target.result); // Return the RSA key object or string
+            } else {
+                reject('RSA key not found');
+            }
+        };
+
+        request.onerror = (event) => reject(event.target.error);
+    });
+}
+
+
+    async function generateAndSendKeyPair(prompt, user) {
+        var privkey = cryptico.generateRSAKey(prompt, 2048);
+        console.log("hidda");
+        console.log(privkey);
+
+        const exportedPublicKey = await cryptico.publicKeyString(privkey);
+        //const publicKeyBase64 = btoa(exportedPublicKey);
+
+
+        await fetch("/api/users/"+user+"/set_public_key", {  // Adjust this URL as needed
+            method: "PUT",
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ public_key: exportedPublicKey })
+        });
+
+    }
+
+
+
+    async function storePrivateKey(privateKey) {
+
+        const db = await initDB(); // Assume initDB initializes and opens your IndexedDB
+
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction(['keys'], 'readwrite');
+            const store = transaction.objectStore('keys');
+            // Store the RSA key object or string directly
+            const request = store.put({ id: 'RSAKey', key: privateKey });
+
+            request.onsuccess = () => resolve();
+            request.onerror = (event) => reject(event.target.error);
+        });
+    }
+
+</script>

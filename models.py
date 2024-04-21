@@ -9,7 +9,7 @@ Prisma docs also looks so much better in comparison
 
 or use SQLite, if you're not into fancy ORMs (but be mindful of Injection attacks :) )
 '''
-
+from flask_login import UserMixin
 from sqlalchemy import String, Integer, Table, ForeignKey, Column, create_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, declarative_base, relationship, Session
 from typing import Dict
@@ -26,10 +26,16 @@ friends_association = Table(
     Column('friend_id', Integer, ForeignKey('user.id'), primary_key=True)
 )
 
+friends_request = Table(
+    'friends_request', Base.metadata,
+    Column('user_id', Integer, ForeignKey('user.id'), primary_key=True),
+    Column('friend_id', Integer, ForeignKey('user.id'), primary_key=True)
+)
+
 
 
 # model to store user information
-class User(Base):
+class User(UserMixin, Base):
     __tablename__ = "user"
     
     # looks complicated but basically means
@@ -48,15 +54,29 @@ class User(Base):
                            secondary=friends_association,
                            primaryjoin=id == friends_association.c.user_id,
                            secondaryjoin=id == friends_association.c.friend_id)
+    
+    friends_request = relationship("User",
+                        secondary=friends_request,
+                        primaryjoin=id == friends_request.c.user_id,
+                        secondaryjoin=id == friends_request.c.friend_id)
+
                            
 
 # stateful counter used to generate the room id
+
+class Message(Base):
+    __tablename__ = 'messages_db'
+    convo_id = Column(Integer, primary_key=True)
+    encryptedconvo1 = Column(String)
+    encryptedconvo2 = Column(String)
+    hmac = Column(String)
+
 class Counter():
     def __init__(self):
         self.counter = 0
     
     def get(self):
-        self.counter += 1
+        self.counter -= 1
         return self.counter
 
 # Room class, used to keep track of which username is in which room

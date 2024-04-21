@@ -1,42 +1,60 @@
-<!-- 
+<!--
     Here you'll find the main exhibit: the chat application code. Feel free to look around!
 -->
 {% extends 'base.jinja' %}
 
-
 {% block content %} 
 <style>
-    
+
     body {
         font-family: Arial, sans-serif;
         margin: 0;
         padding: 0;
         background-color: #f4f4f4;
     }
-    
+
     .main {
         display: flex;
-        justify-content: space-around;
+        justify-content: space-between;
         margin: 20px;
     }
-    
+
     .Chat {
-        flex: 5; /* Takes up 3/4 of the space */
+        flex: 4; /* Takes up 3/4 of the space */
         margin-right: 20px;
         background-color: #fff;
         padding: 20px;
-        border-radius: 5px;
+        border-radius: 10px;
         box-shadow: 0px 0px 5px 0px rgba(0,0,0,0.15);
     }
-    
+
     .Friends {
         flex: 1; /* Takes up 1/4 of the space */
         background-color: #fff;
         padding: 20px;
-        border-radius: 5px;
+        margin-right: 20px;
+        border-radius: 10px;
         box-shadow: 0px 0px 5px 0px rgba(0,0,0,0.15);
     }
-    
+
+    .Incoming_Friends_Request {
+        flex: 1; /* Takes up 1/4 of the space */
+        background-color: #fff;
+        padding: 20px;
+        margin-right: 20px;
+        border-radius: 10px;
+        box-shadow: 0px 0px 5px 0px rgba(0,0,0,0.15);
+    }
+
+    .Outgoing_Friends_Request {
+        flex: 1; /* Takes up 1/4 of the space */
+        background-color: #fff;
+        padding: 20px;
+        margin-right: 20px;
+        border-radius: 10px;
+        box-shadow: 0px 0px 5px 0px rgba(0,0,0,0.15);
+    }
+
     #message_box {
         border: 1px solid #ddd;
         height: 400px;
@@ -46,11 +64,11 @@
         margin-bottom: 20px;
         border-radius: 5px;
     }
-    
+
     .text {
         margin: 5px 0;
     }
-    
+
     nav {
         display: flex;
         justify-content: flex-end;
@@ -59,9 +77,9 @@
         padding: 0.2em 1em;
         font-size: 1.5em;
     }
-    
+
     button {
-        background-color: #f44336; 
+        background-color: #f44336;
         border: none;
         color: white;
         padding: 10px 10px;
@@ -74,7 +92,7 @@
     }
 
     button:hover {
-        background-color: #d32f2f; 
+        background-color: #d32f2f;
         color: #fff;
     }
 
@@ -82,7 +100,7 @@
         font-size: 16px;
         padding: 10px;
     }
-    
+
     h1 {
         text-align: left;
         padding-left: 20px;
@@ -95,6 +113,16 @@
         margin-right: 20px;
     }
 
+    .Friends_button {
+        background: #333;
+        color : white;
+        margin: 10px 0;
+    }
+
+    .button-container {
+        display: block;
+        margin: 10px 0;
+    }
 
 </style>
 
@@ -108,51 +136,58 @@
 
 <h1>Messaging App </h1>
 <main class="main">
-    
+
+
     <div class="Chat">
+        <h3><div id="chatting_to">Chatting to: No one at the moment !</div></h3>
         <!-- The messages are displayed here -->
         <section id="message_box"></section>
 
-        <!-- These part ideally should be a form element, 
-        but I wrote this code a year ago and I don't want to break anything...-->
-        <section id="chat_box">
-            <p class="text">Chat with: </p>
-            <input class="receiver" id="receiver" placeholder="username">
-            <!-- MDN says its bad practice to use the onclick attribute,
-            but we're using it anyways coz its easy :)-->
-            <button onclick="join_room()">Chat</button>
-        </section>
-
-        <!-- The (message) input box is set to display: none initially, 
+        <!-- The (message) input box is set to display: none initially,
         this means the input box is "invisible" initially-->
         <section id="input_box" style="display: none" >
             <p class="text">Message: </p>
-            <input id="message" placeholder="message">
+            <input class="receiver" id="message" placeholder="message">
             <button onclick="send()">Send</button>
             <button onclick="leave()">Leave Room</button>
         </section>
     </div>
 
-    <div class="Friends">  
+    <div class="Incoming_Friends_Request">
+        <h2>Friend Requests</h2>
+
+    </div>
+
+    <div class="Outgoing_Friends_Request">
+        <h2>Friend Requests Sent</h2>
+
+    </div>
+
+    <div class="Friends">
         <h2>Friends List</h2>
-        <ul>
-            <li>Friend 1</li>
-            <li>Friend 2</li>
-            <li>Friend 3</li>
-            <li>Friend 4</li>
-            <li>Friend 5</li>
-        </ul>
+
     </div>
 
 </main>
 
-
+<script src="/static/js/libs/jschmac.bundle.js"></script>
 <script src="/static/js/libs/socket.io.min.js"></script>
 <script>
-    let room_id = 0;
-    generateAndSendKeyPair();
 
-    // when the user presses the "Enter" key inside of the "message box", 
+
+
+
+    let room_id = 0;
+
+    let glob_conversation = "";
+
+    let current_receiver = "";
+
+
+
+
+
+    // when the user presses the "Enter" key inside of the "message box",
     // the message is sent to the server
     $("#message").on("keyup", (e) => {
         if (e.key == "Enter") {
@@ -178,11 +213,9 @@
 
         // the user has already joined an existing room
         // we'll display the message box, instead of the "Chat with: " box
-        $("#chat_box").hide();
-        $("#input_box").show();
         room_id = parseInt(Cookies.get("room_id"));
     })
-    
+
     // Here's the Socket IO part of the code
     // things get a bit complicated here so brace yourselves :P
     let username = "{{ username }}";
@@ -192,154 +225,149 @@
     // initializes the socket
     const socket = io();
 
-    // an incoming message arrives, we'll add the message to the message box
-    socket.on("incoming", (username, encryptedMsg) => {
-        decryptMessage(encryptedMsg)
-            .then(decryptedMessage => {
-                add_message(username + decryptedMessage);
-            });
+    socket.on('update', function(data) {
+        // Assuming you have functions to update HTML with new data
+        updateFriendsList(data.friends);
+        updateOutgoingRequests(data.outgoing);
+        updateIncomingRequests(data.incoming);
     });
 
-    socket.on("incoming_sys", (msg, color="black") => {
-        console.log("hi");
-        add_message(friends + msg, color);
-        console.log("success");
+    // an incoming message arrives, we'll add the message to the message box
+    socket.on("incoming", async (user1, encryptedMsg, mac) => {  // Mark this function as async
+        if (user1 !== username) {
+            try {
+                const decryptedMessage = await decryptMessage(encryptedMsg);
+                if (typeof decryptedMessage === "string" && decryptedMessage.trim() !== "") {
+
+
+
+
+                    let mac_bytes = base64ToUint8Array(mac);
+
+                    let status = await verify_hmac(decryptedMessage, mac_bytes); // Await HMAC verification
+
+                    if (status) {
+                        await add_conversation(decryptedMessage);
+                        await add_message_sys(decryptedMessage);
+                    } else {
+                        console.log("MAC verification failed.");
+                    }
+                }
+            } catch (error) {
+                console.error("Decryption failed:", error); // Handle decryption errors
+                await add_message_sys(`${user1}: [Message could not be decrypted]`);
+            }
+        }
+    });
+
+    socket.on("init_room_id", async (init_id) => {
+
+        room_id = init_id;
+        Cookies.set("room_id", init_id);
     })
 
+    socket.on("incoming_sys_init", async (encrypted_msg, macbase, color="black") => {
+        const encrypted_convo = encrypted_msg.split("+++").filter(msg => msg.trim() !== "");  // Split and filter out empty results
+        const decrypted_msgs = [];
 
-    const dbName = "cryptoKeysDB";
-    const storeName = "keys";
 
-    function initDB() {
-        return new Promise((resolve, reject) => {
-            const openRequest = indexedDB.open(dbName, 1);
 
-            openRequest.onupgradeneeded = function(event) {
-                const db = event.target.result;
-                db.createObjectStore(storeName, { keyPath: "id" });
-            };
-
-            openRequest.onsuccess = function(event) {
-                resolve(event.target.result);
-            };
-
-            openRequest.onerror = function(event) {
-                console.error("IndexedDB error:", openRequest.error);
-                reject(openRequest.error);
-            };
-        });
-    }
-
-    async function storePrivateKey(privateKey) {
-        const db = await initDB();
-
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction([storeName], "readwrite");
-            const store = transaction.objectStore(storeName);
-            const request = store.put({ id: "privateKey", key: privateKey });
-
-            request.onsuccess = function() {
-                resolve();
-            };
-
-            request.onerror = function(event) {
-                console.error("Error storing private key:", request.error);
-                reject(request.error);
-            };
-        });
-    }
-
-    async function getPrivateKey() {
-        const db = await initDB();
-
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction([storeName], "readonly");
-            const store = transaction.objectStore(storeName);
-            const request = store.get("privateKey");
-
-            request.onsuccess = function() {
-                if (request.result) {
-                    resolve(request.result.key);
-                } else {
-                    reject("No private key found");
+        for (let msg of encrypted_convo) {
+            if (msg) {  // Check if the message is not undefined or empty
+                const decrypted = await decryptMessage(msg);
+                if (decrypted) {
+                    if (decrypted.trim() !== "" && decrypted.trim() != "\n") {  // Ensure the decrypted message isn't empty or just whitespace
+                        decrypted_msgs.push(decrypted);  // Add it to the array
+                    }
                 }
-            };
 
-            request.onerror = function(event) {
-                console.error("Error retrieving private key:", request.error);
-                reject(request.error);
-            };
-        });
-    }
-
-    async function generateAndSendKeyPair() {
-        const keyPair = await window.crypto.subtle.generateKey(
-            { name: "RSA-OAEP", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: { name: "SHA-256" } },
-            true,
-            ["encrypt", "decrypt"]
-        );
-
-        await storePrivateKey(keyPair.privateKey);
-
-        const exportedPublicKey = await window.crypto.subtle.exportKey("spki", keyPair.publicKey);
-        const publicKeyBase64 = btoa(String.fromCharCode(...new Uint8Array(exportedPublicKey)));
-
-
-        await fetch(`/api/users/${username}/set_public_key`, {  // Adjust this URL as needed
-            method: "PUT",
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ public_key: publicKeyBase64 })
-        });
-
-        // Store the private key securely, e.g., in IndexedDB
-    }
-
-    async function encryptMessage(publicKeyBase64, message) {
-        const publicKeyBuffer = Uint8Array.from(atob(publicKeyBase64), c => c.charCodeAt(0));
-        const publicKey = await window.crypto.subtle.importKey("spki", publicKeyBuffer, { name: "RSA-OAEP", hash: { name: "SHA-256" } }, true, ["encrypt"]);
-
-        const encrypted = await window.crypto.subtle.encrypt({ name: "RSA-OAEP" }, publicKey, new TextEncoder().encode(message));
-        return btoa(String.fromCharCode(...new Uint8Array(encrypted)));  // Return Base64-encoded encrypted message
-    }
-
-    async function decryptMessage(encryptedMessageBase64) {
-        const privateKey = await getPrivateKey();
-        if (!privateKey) {
-            console.error('Private key not found');
-            throw new Error('Private key not found');
+            }
         }
 
-        if (!encryptedMessageBase64) {
+
+        let decrypted_convo;
+
+        if (decrypted_msgs.length > 0) {
+            decrypted_convo = decrypted_msgs.join("");
+        }
+
+
+
+        add_convo_init(decrypted_convo);
+        let mac_bytes = base64ToUint8Array(macbase);
+        let status = await verify_hmac(decrypted_convo, mac_bytes);
+
+        if (status) {
+            await add_message_sys(decrypted_convo);
+        }
+        else {
+            console.log("Mac verification failed.");
+        }
+
+    });
+
+    socket.on("incoming_sys_disconnect", async () => {
+            Cookies.remove("room_id");
+            await leave();
+            console.error("Your friend has disconnected.");
+        })
+
+
+    window.addEventListener("beforeunload", async function (event) {
+        socket.emit("disconnect", username, room_id);
+        await leave();
+        Cookies.remove("room_id");
+    });
+
+
+
+    async function encryptMessage(publicKey, message) {
+        const encrypted = await cryptico.encrypt(message, publicKey);
+        return encrypted;  // Return Base64-encoded encrypted message
+    }
+
+    async function decryptMessage(encryptedMessage) {
+        const passphrase = await getData();
+        const serial_privkey = await getRSAKey(passphrase);
+        const privateKey = importRSAKey(serial_privkey);
+
+
+        if (!encryptedMessage) {
             console.error('Encrypted message is undefined or null');
             throw new Error('Encrypted message is undefined or null');
         }
 
-        // Ensure it's a string
-        encryptedMessageBase64 = String(encryptedMessageBase64);
-
         // Handle URL-safe Base64 and padding
-        const safeBase64 = encryptedMessageBase64.replace(/-/g, '+').replace(/_/g, '/').replace(/\s/g, '');
-        const paddedBase64 = safeBase64.padEnd(Math.ceil(safeBase64.length / 4) * 4, '=');
+        //const safeBase64 = encryptedMessageBase64.replace(/-/g, '+').replace(/_/g, '/').replace(/\s/g, '');
+        //const paddedBase64 = safeBase64.padEnd(Math.ceil(safeBase64.length / 4) * 4, '=');
 
-        console.log('Encrypted Message Base64:', encryptedMessageBase64);
-
-        let encryptedMessageBuffer;
-        try {
-            encryptedMessageBuffer = Uint8Array.from(atob(paddedBase64), c => c.charCodeAt(0));
-        } catch (e) {
-            console.error('Error decoding Base64 string:', e);
-            throw new Error('Failed to decode Base64 string. Ensure the encrypted message is correctly encoded.');
-        }
-
+        //console.log('Encrypted Message Base64:', encryptedMessageBase64);
+        //encryptedMessage = encryptedMessage.cipher;
         let decrypted;
         try {
-            decrypted = await window.crypto.subtle.decrypt({ name: "RSA-OAEP" }, privateKey, encryptedMessageBuffer);
+            decrypted = await cryptico.decrypt(encryptedMessage, privateKey);
         } catch (e) {
             console.error('Error decrypting message:', e);
             throw new Error('Failed to decrypt message. Ensure the private key matches the public key used for encryption.');
         }
+        if(decrypted.plaintext != undefined && decrypted.plaintext != ""){
+            return decrypted.plaintext;
+        }
+    }
 
-        return new TextDecoder().decode(decrypted);
+    async function fetchUserid(user) {
+        try {
+            const response = await fetch(`/api/users/${user}/get_user_id`, {
+                method: "GET"
+            });
+            /*if (!response.ok) {
+                throw new Error(`Failed to fetch public key for user: ${receiver}`);
+            }*/
+            const data = await response.json();
+            return data.user_id;  // Assuming the backend sends the public key in this field
+        } catch (error) {
+            console.error("Fetching user id failed:", error);
+        }
     }
 
     async function fetchPublicKey(receiver) {
@@ -347,45 +375,123 @@
             const response = await fetch(`/api/users/${receiver}/get_public_key`, {
                 method: "GET"
             });
+            console.log(receiver)
             /*if (!response.ok) {
                 throw new Error(`Failed to fetch public key for user: ${receiver}`);
             }*/
             const data = await response.json();
-            console.log(data);
             return data.pubkey;  // Assuming the backend sends the public key in this field
         } catch (error) {
             console.error("Fetching public key failed:", error);
         }
     }
-    
-    // we'll send the message to the server by emitting a "send" event
+
+    function arrayBufferToBase64(buffer) {
+        let binary = '';
+        let bytes = new Uint8Array(buffer);
+        let len = bytes.byteLength;
+        for (let i = 0; i < len; i++) {
+            binary += String.fromCharCode(bytes[i]);
+        }
+        return window.btoa(binary);
+    }
+
+    function base64ToUint8Array(base64) {
+        var binaryString = window.atob(base64); // Decode base64 to binary string
+        var len = binaryString.length;
+        var bytes = new Uint8Array(len); // Create a new Uint8Array with the same length as the binary string
+        for (var i = 0; i < len; i++) {
+            bytes[i] = binaryString.charCodeAt(i); // Convert each character to a byte
+        }
+        return bytes;
+    }
+
     async function send() {
-        let receiver = $("#receiver").val();
+        let receiver = current_receiver;
         let message = $("#message").val();
-        $("#message").val("");
+        $("#message").val("");  // Clear the message input early for a better user experience
 
         try {
             const receiverPublicKey = await fetchPublicKey(receiver);
             if (!receiverPublicKey) {
                 console.error("No public key found for receiver:", receiver);
+                alert("Cannot find receiver's public key."); // Notify the user visibly
                 return;  // Exit the function if no public key was fetched
             }
-        add_message(username + ": " + message)
-            const encryptedMessage = await encryptMessage(receiverPublicKey, message);
-            socket.emit("send", username, encryptedMessage, room_id);
+
+            let formattedMessage = username + ": " + message;
+            let mac = await generate_hmac(formattedMessage);  // Generate HMAC for the actual message to be sent
+            let encryptedMessage = await encryptMessage(receiverPublicKey, formattedMessage);  // Encrypt the full formatted message
+            let macbase = arrayBufferToBase64(mac);
+            // Emit the message over the socket
+            socket.emit("send", username, encryptedMessage.cipher, macbase, room_id);
+
+            // Add the formatted message to the user's chat window locally for immediate feedback
+            await add_message(formattedMessage)
+
+
         } catch (error) {
             console.error("Error in sending message:", error);
+            alert("Failed to send the message."); // Provide feedback on failure
         }
     }
 
+    // Function to encode strings to Uint8Array
+    function encodeString(input) {
+        const encoder = new TextEncoder();
+        return encoder.encode(input);
+    }
+
+    // Function to generate HMAC
+    async function generate_hmac(message) {
+        const receiver = current_receiver;
+        const user_id = await fetchUserid(username);
+        const receiver_id = await fetchUserid(receiver);
+        const key = `${Math.max(user_id, receiver_id)}${Math.min(user_id, receiver_id)}`;
+        const encodedKey = encodeString(key);
+        const encodedMessage = encodeString(message);
+
+        // Assume HMAC key needs to be 32 bytes; adjust or pad as needed
+        const hmacKey = new Uint8Array(32);
+        hmacKey.set(encodedKey.slice(0, 32));
+
+        // Compute HMAC
+        return window.jschmac.compute(hmacKey, encodedMessage, "SHA-256");
+    }
+
+    // Function to verify HMAC
+    async function verify_hmac(message, mac) {
+        const receiver = current_receiver;
+        const user_id = await fetchUserid(username);
+        const receiver_id = await fetchUserid(receiver);
+        const key = `${Math.max(user_id, receiver_id)}${Math.min(user_id, receiver_id)}`;
+        const encodedKey = encodeString(key);
+        const encodedMessage = encodeString(message);
+
+        // Assume HMAC key needs to be 32 bytes; adjust or pad as needed
+        const hmacKey = new Uint8Array(32);
+        hmacKey.set(encodedKey.slice(0, 32));
+
+        // Verify HMAC
+        return window.jschmac.verify(hmacKey, encodedMessage, mac, "SHA-256");
+    }
+
+    function open_chat(friend) {
+        document.getElementById("chatting_to").innerHTML = "Chatting to: " + friend;
+        join_room(friend);
+        $("#input_box").show();
+    }
+
     // we emit a join room event to the server to join a room
-    function join_room() {
-       
-        let receiver = $("#receiver").val();
+    function join_room(friend) {
+
+        if (friend) {
+            current_receiver = friend;
+        }
 
         // pass in the receiver of our message to the server
         // as well as the current user's username
-        socket.emit("join", username, receiver, (res) => {
+        socket.emit("join", username, current_receiver, (res) => {
             // res is a string with the error message if the error occurs
             // this is a pretty bad way of doing error handling, but watevs
             if (typeof res != "number") {
@@ -396,36 +502,177 @@
             // set the room id variable to the room id returned by the server
             room_id = res;
             Cookies.set("room_id", room_id);
-
             // now we'll show the input box, so the user can input their message
-            $("#chat_box").hide();
-            $("#input_box").show();
+
         });
-     
+
     }
 
     // function when the user clicks on "Leave Room"
     // emits a "leave" event, telling the server that we want to leave the room
-    function leave() {
+    async function leave() {
         Cookies.remove("room_id");
+        clear_convo();
         socket.emit("leave", username, room_id);
+        room_id = await fetchUserid(username);
         $("#input_box").hide();
-        $("#chat_box").show();
+        $("#message_box").empty();
     }
 
     // function to add a message to the message box
-    // called when an incoming message has reached a client
-    function add_message(message, color) {
+    // called when an incoming message has rea
+    // ched a client
+
+    async function add_message_sys(message, color) {
         let box = $("#message_box");
-        let child = $(`<p style="color:${color}; margin: 0px;"></p>`).text(message);
+        // Replace newline characters with <br> tags
+        message = message.replace(/\n/g, '<br>');
+        // Use .html() instead of .text() to interpret the <br> tags
+        let child = $(`<p style="color:${color}; margin: 0px;"></p>`).html(message);
         box.append(child);
+    }
+
+    async function add_message(message, color) {
+        let box = $("#message_box");
+        // Replace newline characters with <br> tags
+        message = message.replace(/\n/g, '<br>');
+        // Use .html() instead of .text() to interpret the <br> tags
+        let child = $(`<p style="color:${color}; margin: 0px;"></p>`).html(message);
+        box.append(child);
+        add_conversation(message);
+        await send_conversation(message);
+    }
+
+    function add_convo_init(message){
+        if (message != "" && message != "\n" && message != undefined) {
+            glob_conversation += message;
+        }
+    }
+
+    function add_conversation(message) {
+        if (message != "" && message != "\n" && message != undefined) {
+            glob_conversation += (message + "\n");
+        }
+    }
+
+    function clear_convo() {
+        glob_conversation = "";
+    }
+
+    async function send_conversation(conversation) {
+        let sender = current_receiver
+        conversation += "\n";
+        const username_id = await fetchUserid(username);
+        const sender_id = await fetchUserid(sender);
+        var user1;
+        var user2;
+        if(username_id && sender_id) {
+            if (username_id > sender_id) {
+                user1 = username;
+                user2 = sender;
+            }
+            else {
+                user1 = sender;
+                user2 = username;
+            }
+        }
+        const pubkey1 = await fetchPublicKey(user1);
+        const pubkey2 = await fetchPublicKey(user2);
+
+        let encrypted_conversation1 = "";
+        let encrypted_conversation2 = "";
+
+        let mac = await generate_hmac(glob_conversation);  // Generate HMAC for the actual message to be sent
+        let macbase = arrayBufferToBase64(mac);
+        encrypted_conversation1 = cryptico.encrypt(conversation, pubkey1);
+        encrypted_conversation2 = cryptico.encrypt(conversation, pubkey2);
+        encrypted_conversation1 = encrypted_conversation1.cipher;
+        encrypted_conversation2 = encrypted_conversation2.cipher;
+
+        socket.emit("send_convo", encrypted_conversation1, encrypted_conversation2, macbase, username, sender);
     }
 
     // Logout function
     function logout() {
-        // Redirect to the logout route
+        // Redirect to the logout rout
         window.location.href = "/logout";
     }
-    
+
+
+    async function add_friend_request() {
+        let friend = prompt("Enter the name of the friend you want to add:");
+        try {
+            friend_id = await fetchUserid(friend);
+            user_id = await fetchUserid(username);
+        } catch(error) {
+            console.error("Error in fetching user id:", error);
+        }
+        if (user_id) {
+            socket.emit("add_friend_request", user_id, friend_id);
+        }
+
+    }
+
+    function add_friend(friend) {
+        socket.emit("add_friend", username, friend);
+    }
+
+    function remove_request(friend) {
+        socket.emit("remove_request", username, friend);
+    }
+
+    function reject_request(friend) {
+        socket.emit("reject_request", username, friend);
+    }
+
+    function updateIncomingRequests(requests) {
+        const container = document.querySelector('.Incoming_Friends_Request');
+        container.innerHTML = '<h2>Friend Requests</h2>';  // Clear content and add header
+        if (!requests.length) {
+            container.innerHTML += '<p>No friend requests yet!</p>';
+        } else {
+            requests.forEach(request => {
+                container.innerHTML += `<div class="button-container">
+                    <button class="Friends_button">${request}</button> <button onclick="add_friend('${request}')">Accept</button> 
+                    <button onclick="reject_request('${request}')">Decline</button>
+                </div>`;
+            });
+        }
+    }
+
+    function updateOutgoingRequests(requests) {
+        const container = document.querySelector('.Outgoing_Friends_Request');
+        container.innerHTML = '<h2>Friend Requests Sent</h2>';  // Clear content and add header
+        if (!requests.length) {
+            container.innerHTML += '<p>No friend requests sent!</p>';
+        } else {
+            requests.forEach(request => {
+                container.innerHTML += `<div class="button-container">
+                    <button class="Friends_button">${request}</button> 
+                    <button class="Friends_button" onclick="remove_request('${request}')">Cancel Request</button>
+                </div>`;
+            });
+        }
+    }
+
+    function updateFriendsList(friends) {
+        const container = document.querySelector('.Friends');
+        container.innerHTML = '<h2>Friends List</h2>';  // Clear content and add header
+        if (!friends.length) {
+            container.innerHTML += '<p>No friends yet!</p>';
+        } else {
+            friends.forEach(friend => {
+                container.innerHTML += `<div class="button-container">
+                    <button onclick="open_chat('${friend}')" class="Friends_button">${friend}</button>
+                    <button class="Friends_button" onclick="remove_friend('${friend}')">Remove</button>
+                </div>`;
+            });
+        }
+        container.innerHTML += '<button onclick="add_friend_request()">Add Friend</button>';
+    }
+
+    function remove_friend(friend) {
+        socket.emit("remove_friend", username, friend);
+    }
 </script>
 {% endblock %}
