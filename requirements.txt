@@ -5,6 +5,7 @@ Flask-SocketIO==5.3.3
 h11==0.14.0
 importlib-metadata==6.2.0
 itsdangerous==2.1.2
+greenlet==3.0.3
 Jinja2==3.1.2
 MarkupSafe==2.1.2
 python-engineio==4.4.0
