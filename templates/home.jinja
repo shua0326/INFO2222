@@ -130,7 +130,7 @@
 <nav>
     <ol>
         <li><b>Username:</b>  {{ username }} </li>
-        <li><button onclick="logout()">Logout</button></li>
+        <li><button onclick="(async () => { await logout(); })()">Logout</button></li>
     </ol>
 </nav>
 
@@ -147,10 +147,18 @@
         this means the input box is "invisible" initially-->
         <section id="input_box" style="display: none" >
             <p class="text">Message: </p>
-            <input class="receiver" id="message" placeholder="message">
-            <button onclick="send()">Send</button>
+            <input class="receiver" id="message" placeholder="message" oninput="checkInput()">
+            <button id="sendButton" onclick="send()" disabled>Send</button>
             <button onclick="leave()">Leave Room</button>
         </section>
+
+        <style>
+            button:disabled {
+                background-color: #cccccc;
+                color: #666666;
+            }
+        </style>
+
     </div>
 
     <div class="Incoming_Friends_Request">
@@ -176,12 +184,15 @@
 
 
 
+    let init_room_id = 0;
 
     let room_id = 0;
 
     let glob_conversation = "";
 
     let current_receiver = "";
+
+    let is_talking = false;
 
 
 
@@ -203,18 +214,14 @@
         }
     })
 
-
     $(document).ready(() => {
-        // room_id is undefined if the user hasn't joined a room
-        // we early return in this case
-        if (Cookies.get("room_id") == undefined) {
-            return;
-        }
+        // Call checkInput initially to set the correct state of the "Send" button
+        checkInput();
 
-        // the user has already joined an existing room
-        // we'll display the message box, instead of the "Chat with: " box
-        room_id = parseInt(Cookies.get("room_id"));
-    })
+        // Call checkInput whenever the value of the input box changes
+        $("#message").on("input change paste", checkInput);
+        // ...
+    });
 
     // Here's the Socket IO part of the code
     // things get a bit complicated here so brace yourselves :P
@@ -225,6 +232,16 @@
     // initializes the socket
     const socket = io();
 
+    //unlocks the send button when the input box is filled with text
+    function checkInput() {
+        var message = document.getElementById('message').value;
+        if (message.trim() != '') {
+            document.getElementById('sendButton').disabled = false;
+        } else {
+            document.getElementById('sendButton').disabled = true;
+        }
+    }
+
     socket.on('update', function(data) {
         // Assuming you have functions to update HTML with new data
         updateFriendsList(data.friends);
@@ -234,18 +251,15 @@
 
     // an incoming message arrives, we'll add the message to the message box
     socket.on("incoming", async (user1, encryptedMsg, mac) => {  // Mark this function as async
-        if (user1 !== username) {
+        if (user1 == username) {   // Ensure the message is meant for this user
             try {
-                const decryptedMessage = await decryptMessage(encryptedMsg);
-                if (typeof decryptedMessage === "string" && decryptedMessage.trim() !== "") {
-
-
-
-
+                const decryptedMessage = await decryptMessage(encryptedMsg);    //Decrypts the message using the user's private key
+                if (typeof decryptedMessage === "string" && decryptedMessage.trim() !== "") {   //ensuring the string is in the right format
                     let mac_bytes = base64ToUint8Array(mac);
 
                     let status = await verify_hmac(decryptedMessage, mac_bytes); // Await HMAC verification
-
+                    console.log(decryptedMessage)
+                    //Only add the message if the MAC verification passes
                     if (status) {
                         await add_conversation(decryptedMessage);
                         await add_message_sys(decryptedMessage);
@@ -263,15 +277,22 @@
     socket.on("init_room_id", async (init_id) => {
 
         room_id = init_id;
+        init_room_id = init_id;
+        console.log(init_room_id);
         Cookies.set("room_id", init_id);
     })
 
-    socket.on("incoming_sys_init", async (encrypted_msg, macbase, color="black") => {
+    socket.on("incoming_sys_init", async (encrypted_msg, macbase, room_id, color="black") => {
+        
+        if (!encrypted_msg) {
+            Cookies.set("room_id", room_id);
+            return;
+        }
+
         const encrypted_convo = encrypted_msg.split("+++").filter(msg => msg.trim() !== "");  // Split and filter out empty results
         const decrypted_msgs = [];
 
-
-
+        //decrypting conversation messages
         for (let msg of encrypted_convo) {
             if (msg) {  // Check if the message is not undefined or empty
                 const decrypted = await decryptMessage(msg);
@@ -284,16 +305,14 @@
             }
         }
 
-
-        let decrypted_convo;
-
+        //joins the decrypted messages into one string
+        let decrypted_convo = '';
         if (decrypted_msgs.length > 0) {
             decrypted_convo = decrypted_msgs.join("");
         }
-
-
-
+        //conversation history is added to the global conversation
         add_convo_init(decrypted_convo);
+        console.log(decrypted_convo);
         let mac_bytes = base64ToUint8Array(macbase);
         let status = await verify_hmac(decrypted_convo, mac_bytes);
 
@@ -303,18 +322,20 @@
         else {
             console.log("Mac verification failed.");
         }
+        Cookies.set("room_id", room_id);
 
     });
 
-    socket.on("incoming_sys_disconnect", async () => {
-            Cookies.remove("room_id");
-            await leave();
+    socket.on("incoming_sys_disconnect", () => {
+            console.log("bro has disconnected");
+            Cookies.set("room_id", room_id);
+            leave();
             console.error("Your friend has disconnected.");
         })
 
 
     window.addEventListener("beforeunload", async function (event) {
-        socket.emit("disconnect", username, room_id);
+        socket.emit("user_disconnect", username, room_id);
         await leave();
         Cookies.remove("room_id");
     });
@@ -332,24 +353,25 @@
         const privateKey = importRSAKey(serial_privkey);
 
 
+
         if (!encryptedMessage) {
-            console.error('Encrypted message is undefined or null');
+            console.log('Encrypted message is undefined or null');
             throw new Error('Encrypted message is undefined or null');
         }
 
-        // Handle URL-safe Base64 and padding
-        //const safeBase64 = encryptedMessageBase64.replace(/-/g, '+').replace(/_/g, '/').replace(/\s/g, '');
-        //const paddedBase64 = safeBase64.padEnd(Math.ceil(safeBase64.length / 4) * 4, '=');
 
-        //console.log('Encrypted Message Base64:', encryptedMessageBase64);
-        //encryptedMessage = encryptedMessage.cipher;
+
         let decrypted;
         try {
             decrypted = await cryptico.decrypt(encryptedMessage, privateKey);
         } catch (e) {
-            console.error('Error decrypting message:', e);
+            console.log('Error decrypting message:', e);
             throw new Error('Failed to decrypt message. Ensure the private key matches the public key used for encryption.');
         }
+        
+        console.log(decrypted);
+        console.log(decrypted.plaintext);
+
         if(decrypted.plaintext != undefined && decrypted.plaintext != ""){
             return decrypted.plaintext;
         }
@@ -364,6 +386,7 @@
                 throw new Error(`Failed to fetch public key for user: ${receiver}`);
             }*/
             const data = await response.json();
+            console.log(data);
             return data.user_id;  // Assuming the backend sends the public key in this field
         } catch (error) {
             console.error("Fetching user id failed:", error);
@@ -375,10 +398,6 @@
             const response = await fetch(`/api/users/${receiver}/get_public_key`, {
                 method: "GET"
             });
-            console.log(receiver)
-            /*if (!response.ok) {
-                throw new Error(`Failed to fetch public key for user: ${receiver}`);
-            }*/
             const data = await response.json();
             return data.pubkey;  // Assuming the backend sends the public key in this field
         } catch (error) {
@@ -407,24 +426,32 @@
     }
 
     async function send() {
-        let receiver = current_receiver;
-        let message = $("#message").val();
+        let receiver = current_receiver;    //Gets the current receiver
+        let message = $("#message").val();  // Get the message from the input box
+
         $("#message").val("");  // Clear the message input early for a better user experience
+        checkInput();
 
         try {
+            //grabs the receiver's public key
             const receiverPublicKey = await fetchPublicKey(receiver);
+
             if (!receiverPublicKey) {
                 console.error("No public key found for receiver:", receiver);
-                alert("Cannot find receiver's public key."); // Notify the user visibly
+                alert("Cannot find receiver's public key."); // Notifies the user if the public key is not found
                 return;  // Exit the function if no public key was fetched
             }
 
-            let formattedMessage = username + ": " + message;
+            let formattedMessage = username + ": " + message;   //formats message to include the sender's name
             let mac = await generate_hmac(formattedMessage);  // Generate HMAC for the actual message to be sent
             let encryptedMessage = await encryptMessage(receiverPublicKey, formattedMessage);  // Encrypt the full formatted message
             let macbase = arrayBufferToBase64(mac);
+
+
+            let current_room_id = Cookies.get("room_id");
+            console.log(current_room_id);
             // Emit the message over the socket
-            socket.emit("send", username, encryptedMessage.cipher, macbase, room_id);
+            socket.emit("send", receiver, encryptedMessage.cipher, macbase, current_room_id);
 
             // Add the formatted message to the user's chat window locally for immediate feedback
             await add_message(formattedMessage)
@@ -477,23 +504,17 @@
     }
 
     function open_chat(friend) {
-        document.getElementById("chatting_to").innerHTML = "Chatting to: " + friend;
         join_room(friend);
-        $("#input_box").show();
     }
 
     // we emit a join room event to the server to join a room
     function join_room(friend) {
-
-        if (friend) {
-            current_receiver = friend;
-        }
-
-        // pass in the receiver of our message to the server
-        // as well as the current user's username
+        console.log("Joining room with: " + friend);
+        current_receiver = friend;  //sets receiver to the friend you clicked on
+        //pass in the receiver of our message to the server as well as the current user's username
         socket.emit("join", username, current_receiver, (res) => {
-            // res is a string with the error message if the error occurs
-            // this is a pretty bad way of doing error handling, but watevs
+
+            // returns an error message if the server returns an error
             if (typeof res != "number") {
                 alert(res);
                 return;
@@ -502,19 +523,22 @@
             // set the room id variable to the room id returned by the server
             room_id = res;
             Cookies.set("room_id", room_id);
-            // now we'll show the input box, so the user can input their message
 
+            // now we'll show the input box, so the user can input their message
+            document.getElementById("chatting_to").innerHTML = "Chatting to: " + friend;    //updates the chatting to box
+            $("#input_box").show();
         });
 
     }
 
     // function when the user clicks on "Leave Room"
     // emits a "leave" event, telling the server that we want to leave the room
-    async function leave() {
+    function leave() {
         Cookies.remove("room_id");
+        Cookies.set("room_id", init_room_id);
         clear_convo();
-        socket.emit("leave", username, room_id);
-        room_id = await fetchUserid(username);
+        socket.emit("leave", username, init_room_id);
+        document.getElementById("chatting_to").innerHTML = "Chatting to: No one at the moment !";
         $("#input_box").hide();
         $("#message_box").empty();
     }
@@ -535,12 +559,14 @@
     async function add_message(message, color) {
         let box = $("#message_box");
         // Replace newline characters with <br> tags
-        message = message.replace(/\n/g, '<br>');
+        await add_conversation(message); //appends to global conversation variable
+        await send_conversation(message);   //sends the encrypted message to the server
+        let formatted_message=message.replace(/\n/g, '<br>');
         // Use .html() instead of .text() to interpret the <br> tags
-        let child = $(`<p style="color:${color}; margin: 0px;"></p>`).html(message);
-        box.append(child);
-        add_conversation(message);
-        await send_conversation(message);
+        let child = $(`<p style="color:${color}; margin: 0px;"></p>`).html(formatted_message);
+        box.append(child);  //adds the message to the box
+
+        
     }
 
     function add_convo_init(message){
@@ -549,7 +575,7 @@
         }
     }
 
-    function add_conversation(message) {
+    async function add_conversation(message) {
         if (message != "" && message != "\n" && message != undefined) {
             glob_conversation += (message + "\n");
         }
@@ -560,10 +586,12 @@
     }
 
     async function send_conversation(conversation) {
-        let sender = current_receiver
-        conversation += "\n";
-        const username_id = await fetchUserid(username);
-        const sender_id = await fetchUserid(sender);
+        let sender = current_receiver   //Gets the current receiver
+        conversation += "\n";   //Adds a newline character to the end of the message
+        const username_id = await fetchUserid(username);    //Fetches the user id of the current user
+        const sender_id = await fetchUserid(sender);    //Fetches the user id of the sender
+
+        //determines which user is user1 and which is user2
         var user1;
         var user2;
         if(username_id && sender_id) {
@@ -576,31 +604,41 @@
                 user2 = username;
             }
         }
+
+        //grabs public keys of user to encrypt
         const pubkey1 = await fetchPublicKey(user1);
         const pubkey2 = await fetchPublicKey(user2);
 
         let encrypted_conversation1 = "";
         let encrypted_conversation2 = "";
 
-        let mac = await generate_hmac(glob_conversation);  // Generate HMAC for the actual message to be sent
+        let mac = await generate_hmac(glob_conversation);  // Generate HMAC for the entirety of the conversation history
         let macbase = arrayBufferToBase64(mac);
+
+        //creates two encrypted messages, one for each user
         encrypted_conversation1 = cryptico.encrypt(conversation, pubkey1);
         encrypted_conversation2 = cryptico.encrypt(conversation, pubkey2);
         encrypted_conversation1 = encrypted_conversation1.cipher;
         encrypted_conversation2 = encrypted_conversation2.cipher;
 
+        //sends the encrypted conversations to the server
         socket.emit("send_convo", encrypted_conversation1, encrypted_conversation2, macbase, username, sender);
     }
 
     // Logout function
-    function logout() {
+    async function logout() {
         // Redirect to the logout rout
-        window.location.href = "/logout";
+        socket.emit("user_disconnect", username, room_id, function(response) {
+            if (response) {
+                window.location.href = "/logout";
+            }
+        });
     }
 
 
     async function add_friend_request() {
         let friend = prompt("Enter the name of the friend you want to add:");
+        friend = encodeURI(friend);
         try {
             friend_id = await fetchUserid(friend);
             user_id = await fetchUserid(username);
@@ -633,7 +671,7 @@
         } else {
             requests.forEach(request => {
                 container.innerHTML += `<div class="button-container">
-                    <button class="Friends_button">${request}</button> <button onclick="add_friend('${request}')">Accept</button> 
+                    <button class="Friends_button">${request}</button> <button onclick="add_friend('${request}')">Accept</button>
                     <button onclick="reject_request('${request}')">Decline</button>
                 </div>`;
             });
@@ -648,7 +686,7 @@
         } else {
             requests.forEach(request => {
                 container.innerHTML += `<div class="button-container">
-                    <button class="Friends_button">${request}</button> 
+                    <button class="Friends_button">${request}</button>
                     <button class="Friends_button" onclick="remove_request('${request}')">Cancel Request</button>
                 </div>`;
             });

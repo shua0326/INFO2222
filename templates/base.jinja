@@ -27,6 +27,8 @@ Yeah I know it's pretty ugly...
 <script>
     const dbName = "cryptoKeysDB";
     const storeName = "keys";
+
+    // This is a simple hashing function for strings
     String.prototype.hashCode = function() {
       var hash = 0,
         i, chr;
@@ -34,7 +36,7 @@ Yeah I know it's pretty ugly...
       for (i = 0; i < this.length; i++) {
         chr = this.charCodeAt(i);
         hash = ((hash << 5) - hash) + chr;
-        hash |= 0; // Convert to 32bit integer
+        hash |= 0;
       }
       return hash;
     }
@@ -184,15 +186,11 @@ Yeah I know it's pretty ugly...
 
 
     async function generateAndSendKeyPair(prompt, user) {
-        var privkey = cryptico.generateRSAKey(prompt, 2048);
-        console.log("hidda");
-        console.log(privkey);
+        var privkey = cryptico.generateRSAKey(prompt, 2048);    //generate 2048-bit RSA key pair
+        const exportedPublicKey = await cryptico.publicKeyString(privkey); //exports public key
 
-        const exportedPublicKey = await cryptico.publicKeyString(privkey);
-        //const publicKeyBase64 = btoa(exportedPublicKey);
-
-
-        await fetch("/api/users/"+user+"/set_public_key", {  // Adjust this URL as needed
+        //Sends public key to server
+        await fetch("/api/users/"+user+"/set_public_key", {
             method: "PUT",
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ public_key: exportedPublicKey })

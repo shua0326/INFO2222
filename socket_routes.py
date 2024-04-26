@@ -6,6 +6,7 @@ file containing all the routes related to socket.io
 from flask_socketio import join_room, emit, leave_room
 from flask_login import current_user
 from flask import request, session, abort
+from markupsafe import escape
 
 try:
     from __main__ import socketio
@@ -24,7 +25,8 @@ connected_users = {}
 # this event is emitted when the io() function is called in JS
 @socketio.on('connect')
 def connect():
-    username = request.cookies.get("username")
+    username_input = request.cookies.get("username")
+    username = escape(username_input)
     user_id = db.get_user_id(username)
     if username is None:
         return
@@ -43,20 +45,27 @@ def update_client(user_id):
     outgoing = db.get_outgoing_friends_request(user_id)
     incoming = db.get_incoming_friends_request(user_id)
     emit('update', {'friends': friends, 'outgoing': outgoing, 'incoming': incoming}, to=room_id)
-  
+
 
 # event when client disconnects
 # quite unreliable use sparingly
-@socketio.on('disconnect')
+@socketio.on('user_disconnect')
 def disconnect(username, room_id):
     user_id = db.get_user_id(username)
     if room_id is None or username is None:
         return
-    emit("incoming_sys_disconnect", to=int(room_id))
+    conversation_to_be_disconnected = db.get_to_disconnect_convos(db.get_user_id(username))
+    for user_id in conversation_to_be_disconnected:
+        if not is_user_online(int(user_id)):
+            continue
+        print(conversation_to_be_disconnected[user_id])
+        if conversation_to_be_disconnected[user_id] == room.get_room_id(db.get_username(user_id)):
+            emit("incoming_sys_disconnect", to=room.get_room_id(db.get_username(user_id)))
     if user_id in connected_users:
         del connected_users[user_id]
     leave_room(room_id)
     room.leave_room(username)
+    return "User disconnected!"
 
 
 def is_user_online(user_id):
@@ -66,20 +75,26 @@ def is_user_online(user_id):
 @socketio.on("send")
 def send(username, message, mac, room_id):
     if not current_user.is_authenticated:
+        return "User not authenticated!"
         disconnect()
-    emit("incoming", (f"{username}: ", f"{message}", mac), to=room_id)
-    
+
+    emit("incoming", (f"{username}", f"{message}", mac), to=room_id, include_self=False)
+
 # join room event handler
 # sent when the user joins a room
 @socketio.on("join")
 def join(sender_name, receiver_name):
+    #various validation and error checking
     if not current_user.is_authenticated:
+        print("User not authenticated!")
         disconnect()
     receiver = db.get_user(receiver_name)
+
     if receiver is None:
         return "Unknown receiver!"
-    
+
     sender = db.get_user(sender_name)
+
     if sender is None:
         return "Unknown sender!"
 
@@ -88,29 +103,46 @@ def join(sender_name, receiver_name):
 
     if not is_user_online(db.get_user_id(receiver_name)):
         return "User is not online!"
+
     user_id = db.get_user_id(sender_name)
     friends_list = db.get_friends(user_id)
     if receiver_name not in friends_list:
         return "You are not friends with this user!"
 
-
-    room_id = room.get_room_id(receiver_name)
+    #sets room id and convo id
+    room_id = room.get_room_id(sender_name)   #the user's current room id
     convo_id = db.generate_convo_id(int(db.get_user_id(sender_name)), int(db.get_user_id(receiver_name)))
+
+    if db.get_convo(convo_id, "encryptedconvo1") is None:
+        room.join_room(sender_name, convo_id)
+        join_room(convo_id)
+        #send the corresponding encrypted message to the user
+        emit("incoming_sys_init", ("", "", convo_id))
+
+        
+
+        return int(convo_id)
+
+    #determines which encryptedconvo to send
     row = ""
     if int(db.get_user_id(sender_name)) > int(db.get_user_id(receiver_name)):
         row = "encryptedconvo1"
     elif int(db.get_user_id(sender_name)) < int(db.get_user_id(receiver_name)):
         row = "encryptedconvo2"
     encrypted_message = db.get_convo(convo_id, row)
-    hmac = db.get_hmac(convo_id)
 
-    # if the user is already inside of a room
+    #grab the hmac value if a encrypted message is found
+    if encrypted_message:
+        hmac = db.get_hmac(convo_id)
+        room.join_room(sender_name, convo_id)
+        join_room(convo_id)
+        #send the corresponding encrypted message to the user
+        emit("incoming_sys_init", (f"{encrypted_message}", hmac, convo_id))
+
         
-    room.join_room(sender_name, room_id)
-    join_room(room_id)
 
-    emit("incoming_sys_init", (f"{encrypted_message}", hmac), to=room_id)
-    return room_id
+        return int(convo_id)
+
 
 @socketio.on("send_convo")
 def send_convo(convo1, convo2, hmac, user, sender):
@@ -118,15 +150,20 @@ def send_convo(convo1, convo2, hmac, user, sender):
         disconnect()
     convo_id = db.generate_convo_id(int(db.get_user_id(user)), int(db.get_user_id(sender)))
     db.update_convo(convo_id, convo1, convo2, hmac)
+
 # leave room event handler
 @socketio.on("leave")
 def leave(username, room_id):
+    current_room = room.get_room_id(username)
+    leave_room(current_room)
+    room.leave_room(current_room)
     if not current_user.is_authenticated:
         disconnect()
     #emit("receiver_left", to=room_id)
-    leave_room(room_id)
-    room.leave_room(username)
-    connect()
+    init_room_id = db.get_user_id(username)
+    room.join_room(username, init_room_id)
+    join_room(init_room_id)
+    emit("init_room_id", init_room_id)
     
     
 @socketio.on("add_friend_request")

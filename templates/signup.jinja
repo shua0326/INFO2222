@@ -31,38 +31,51 @@ Sign up page, pretty much the same as login.
 
         // this function is identical to login(), see login.jinja
         async function signup() {
+
             let loginURL = "{{ url_for('signup_user') }}";
+
             let password = $("#password").val();
             password = password.replace(/\s/g, '');
+
+            // checks if the inputted password matches the password requirements
             if (!isValidPassword(password)) {
                 alert("Invalid password. Password must be at least 8 characters long, contain at least one uppercase letter, one lowercase letter, one number, and one special character.");
                 return;
             }
-            password = password.hashCode();
+            password = password.hashCode(); //password is hashed
 
+            //inputs are escaped
+            let username = encodeURIComponent($("#username").val());
+            password = encodeURIComponent(password);
+
+            //inputs are passed to the server
             let res = await axios.post(loginURL, {
-                username: $("#username").val(),
+                username: username,
                 password: password
             });
+
+            // if the server sends in an error message, alert() the error message
             if (!isValidURL(res.data)) {
                 alert(res.data);
                 return;
             }
-            var revpas = $("#password").val();
-            var user = $("#username").val();
-            // redirects to the URL (ie. res.data),
-            // we use _self here since we all hate that moment
-            // when the browser opens a new tab
 
-            //const privkey = getPrivateKey();
+            //creates a passphrase by concatenating the password and username, ensures that the passphrase is unique to the user, then hashes for security
+            var revpas = password;
+            var user = username;
             var passphrase = revpas + user;
             //passphrase = String(passphrase.hashCode());
+
+            //generates a keypair and sends the public key to the server
             await generateAndSendKeyPair(passphrase, user);
+
+            //generates the private key as a RSAKey object
             const privkey = cryptico.generateRSAKey(passphrase, 2048);
-            const serial_privkey = exportRSAKey(privkey);
-            await storeRSAKey(serial_privkey, passphrase);
-            await addData(passphrase);
-            window.open(res.data, "_self")
+            const serial_privkey = exportRSAKey(privkey);   //exports the private key as a string
+            await storeRSAKey(serial_privkey, passphrase);  //stores the private key in the IndexedDB
+            await addData(passphrase);  //adds the passphrase to the IndexedDB
+
+            window.open(res.data, "_self")  //opens the home page corresponding to the user
         }
     </script>
 {% endblock %}

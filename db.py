@@ -23,9 +23,9 @@ engine = create_engine("sqlite:///database/main.db", echo=True)
 Base.metadata.create_all(engine)
 
 # inserts a user to the database
-def insert_user(username: str, id:int, password: str):
+def insert_user(id:int, username: str, password: str, pubkey: str):
     with Session(engine) as session:
-        user = User(username=username, id=id, password=password)
+        user = User(id=id, username=username, password=password, pubkey=pubkey)
         session.add(user)
         session.commit()
 
@@ -156,9 +156,10 @@ def get_outgoing_friends_request(user_id: int):
 
 def update_convo(convo_id, encrypted_message1, encrypted_message2, hmac):
     with Session(engine) as session:
+        #grabbing the corresponding encryptedconvo, encryptedconvo2, and hmac from the database
         result = session.query(Message).filter(Message.convo_id == convo_id).one_or_none()
         if result:
-            # If the convo_id exists, update the message
+            # If the convo_id exists, update the message, adding the delimiter
             result.encryptedconvo1 += "+++" + encrypted_message1
             result.encryptedconvo2 += "+++" + encrypted_message2
             result.hmac = hmac
@@ -178,6 +179,14 @@ def get_convo(convo_id, row):
                 return result.encryptedconvo2
         else:
             return None
+
+def get_to_disconnect_convos(user_id):
+    with Session(engine) as session:
+        user_id_str = str(user_id)
+        convos_to_be_disconnected = session.query(Message.convo_id).filter(Message.convo_id.like(f"%{user_id_str}%")).all()
+        # Create a dictionary where the keys are the convo_ids with the user_id removed and the values are the original convo_ids
+        convos_dict = {str(convo[0]).replace(user_id_str, ''): str(convo[0]) for convo in convos_to_be_disconnected}
+        return convos_dict
 
 def get_hmac(convo_id):
     with Session(engine) as session:
