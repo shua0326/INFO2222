@@ -102,7 +102,6 @@ def remove_friend(user_id, friend_id):
         if not user or not friend:
             print("User or friend not found.")
             return
-
         # Remove the friend from the user's list of friends
         # This breaks the friendship in one direction
         user.friends.remove(friend)
@@ -201,9 +200,6 @@ def generate_convo_id(user_id1, user_id2):
 
 def set_user_public_key(user_id, public_key):
     with Session(engine) as session:
-        print()
-        print("Setting public key for user_id:", user_id)
-        print()
         user = session.query(User).filter(User.id == user_id).first()
         user.pubkey = public_key
         session.commit()

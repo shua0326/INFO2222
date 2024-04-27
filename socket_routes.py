@@ -118,9 +118,6 @@ def join(sender_name, receiver_name):
         join_room(convo_id)
         #send the corresponding encrypted message to the user
         emit("incoming_sys_init", ("", "", convo_id))
-
-        
-
         return int(convo_id)
 
     #determines which encryptedconvo to send
@@ -138,9 +135,6 @@ def join(sender_name, receiver_name):
         join_room(convo_id)
         #send the corresponding encrypted message to the user
         emit("incoming_sys_init", (f"{encrypted_message}", hmac, convo_id))
-
-        
-
         return int(convo_id)
 
 

@@ -98,7 +98,7 @@ def set_public_key(username):
         print("No public key provided")
         return jsonify({'error': 'Missing public key'}), 400
 
-    user = db.get_user(username)    #grabs the user object from the passed username
+    user = current_user    #grabs the user object from the passed username
 
     db.set_user_public_key(user.id, public_key)  #sets the public key for the user
     return jsonify({'message': 'Public key updated successfully'}), 200 #returns a success message
@@ -122,12 +122,10 @@ def get_public_key(username):
     return jsonify({'pubkey': public_key}), 200
 
 @app.route("/api/users/<string:username>/get_user_id", methods=["GET"])
-
 def get_user_id(username):
     # Retrieve the user from your data store. This could be a database, etc.
     # This is just a placeholder function. Replace it with your actual user retrieval logic.
     user_id = db.get_user_id(username)
-
     if not user_id:
         return jsonify({'error': 'User not found'}), 404
 
@@ -193,7 +191,7 @@ def logout():
     return redirect(url_for('index'))
 
 if __name__ == '__main__':
-    #socketio.run(app)
+    socketio.run(app)
 
-    socketio.run(app, ssl_context=('./certs/mydomain.crt',
-                                   './certs/mydomain.key'))
+    #socketio.run(app, ssl_context=('./certs/mydomain.crt',
+                                #    './certs/mydomain.key'))
