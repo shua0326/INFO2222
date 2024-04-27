@@ -2,11 +2,9 @@
 socket_routes
 file containing all the routes related to socket.io
 '''
-
+import flask_socketio
 from flask_socketio import join_room, emit, leave_room
-from flask_login import current_user
-from flask import request, session, abort
-from markupsafe import escape
+from flask_login import current_user, AnonymousUserMixin
 
 try:
     from __main__ import socketio
@@ -25,8 +23,7 @@ connected_users = {}
 # this event is emitted when the io() function is called in JS
 @socketio.on('connect')
 def connect():
-    username_input = request.cookies.get("username")
-    username = escape(username_input)
+    username = current_user.username
     user_id = db.get_user_id(username)
     if username is None:
         return
@@ -39,30 +36,39 @@ def connect():
 
 def update_client(user_id):
     if not current_user.is_authenticated:
-        disconnect()
+        flask_socketio.disconnect()
     room_id = room.get_room_id(db.get_username(user_id))
     friends = db.get_friends(user_id)
     outgoing = db.get_outgoing_friends_request(user_id)
     incoming = db.get_incoming_friends_request(user_id)
     emit('update', {'friends': friends, 'outgoing': outgoing, 'incoming': incoming}, to=room_id)
 
+@socketio.on('disconnect')
+def handle_disconnect():
+    for user_id in connected_users:
+        if not db.get_user(db.get_username(user_id)).is_anonymous:
+            del connected_users[user_id]
+            room.leave_room(db.get_username(user_id))
+
 
 # event when client disconnects
 # quite unreliable use sparingly
 @socketio.on('user_disconnect')
-def disconnect(username, room_id):
-    user_id = db.get_user_id(username)
+def disconnect(given_username):
+    if given_username:
+        username = given_username
+    else:
+        username = current_user.username
+    room_id = room.get_room_id(username)
     if room_id is None or username is None:
         return
     conversation_to_be_disconnected = db.get_to_disconnect_convos(db.get_user_id(username))
     for user_id in conversation_to_be_disconnected:
         if not is_user_online(int(user_id)):
             continue
-        print(conversation_to_be_disconnected[user_id])
         if conversation_to_be_disconnected[user_id] == room.get_room_id(db.get_username(user_id)):
-            emit("incoming_sys_disconnect", to=room.get_room_id(db.get_username(user_id)))
-    if user_id in connected_users:
-        del connected_users[user_id]
+            emit("incoming_sys_disconnect", to=room.get_room_id(db.get_username(user_id)), include_self=False)
+    del connected_users[db.get_user_id(username)]
     leave_room(room_id)
     room.leave_room(username)
     return "User disconnected!"
@@ -73,11 +79,17 @@ def is_user_online(user_id):
 
 # send message event handler
 @socketio.on("send")
-def send(username, message, mac, room_id):
+def send(username, message, mac):
     if not current_user.is_authenticated:
         return "User not authenticated!"
-        disconnect()
-
+        flask_socketio.disconnect()
+    if not is_user_online(db.get_user_id(username)):
+        return False
+    friends_list = db.get_friends(db.get_user_id(current_user.username))
+    if username not in friends_list:
+        emit("incoming_sys_disconnect")
+        return "You are not friends with this user!"
+    room_id = room.get_room_id(username)
     emit("incoming", (f"{username}", f"{message}", mac), to=room_id, include_self=False)
 
 # join room event handler
@@ -86,8 +98,7 @@ def send(username, message, mac, room_id):
 def join(sender_name, receiver_name):
     #various validation and error checking
     if not current_user.is_authenticated:
-        print("User not authenticated!")
-        disconnect()
+        flask_socketio.disconnect()
     receiver = db.get_user(receiver_name)
 
     if receiver is None:
@@ -110,14 +121,13 @@ def join(sender_name, receiver_name):
         return "You are not friends with this user!"
 
     #sets room id and convo id
-    room_id = room.get_room_id(sender_name)   #the user's current room id
     convo_id = db.generate_convo_id(int(db.get_user_id(sender_name)), int(db.get_user_id(receiver_name)))
 
     if db.get_convo(convo_id, "encryptedconvo1") is None:
         room.join_room(sender_name, convo_id)
         join_room(convo_id)
         #send the corresponding encrypted message to the user
-        emit("incoming_sys_init", ("", "", convo_id))
+        emit("incoming_sys_init", (""))
         return int(convo_id)
 
     #determines which encryptedconvo to send
@@ -130,29 +140,28 @@ def join(sender_name, receiver_name):
 
     #grab the hmac value if a encrypted message is found
     if encrypted_message:
-        hmac = db.get_hmac(convo_id)
         room.join_room(sender_name, convo_id)
         join_room(convo_id)
         #send the corresponding encrypted message to the user
-        emit("incoming_sys_init", (f"{encrypted_message}", hmac, convo_id))
+        emit("incoming_sys_init", (f"{encrypted_message}"))
         return int(convo_id)
 
 
 @socketio.on("send_convo")
-def send_convo(convo1, convo2, hmac, user, sender):
+def send_convo(convo1, convo2, user, sender):
     if not current_user.is_authenticated:
-        disconnect()
+        flask_socketio.disconnect()
     convo_id = db.generate_convo_id(int(db.get_user_id(user)), int(db.get_user_id(sender)))
-    db.update_convo(convo_id, convo1, convo2, hmac)
+    db.update_convo(convo_id, convo1, convo2)
 
 # leave room event handler
 @socketio.on("leave")
-def leave(username, room_id):
+def leave(username):
     current_room = room.get_room_id(username)
     leave_room(current_room)
     room.leave_room(current_room)
     if not current_user.is_authenticated:
-        disconnect()
+        flask_socketio.disconnect()
     #emit("receiver_left", to=room_id)
     init_room_id = db.get_user_id(username)
     room.join_room(username, init_room_id)
@@ -163,7 +172,7 @@ def leave(username, room_id):
 @socketio.on("add_friend_request")
 def add_friend_request(user_id, friend_id):
     if not current_user.is_authenticated:
-        disconnect()
+        flask_socketio.disconnect()
     db.add_friend_request(user_id, friend_id)
     room_id = room.get_room_id(db.get_username(friend_id))
     update_client(friend_id)
@@ -173,7 +182,7 @@ def add_friend_request(user_id, friend_id):
 @socketio.on("add_friend")
 def add_friend(user, friend):
     if not current_user.is_authenticated:
-        disconnect()
+        flask_socketio.disconnect()
     user_id = db.get_user_id(user)
     friend_id = db.get_user_id(friend)
     db.remove_request(user_id, friend_id)
@@ -184,7 +193,7 @@ def add_friend(user, friend):
 @socketio.on("remove_request")
 def remove_request(user, friend):
     if not current_user.is_authenticated:
-        disconnect()
+        flask_socketio.disconnect()
     user_id = db.get_user_id(user)
     friend_id = db.get_user_id(friend)
     db.remove_request(friend_id, user_id)
@@ -194,7 +203,7 @@ def remove_request(user, friend):
 @socketio.on("reject_request")
 def remove_request(user, friend):
     if not current_user.is_authenticated:
-        disconnect()
+        flask_socketio.disconnect()
     user_id = db.get_user_id(user)
     friend_id = db.get_user_id(friend)
     db.remove_request(user_id, friend_id)
@@ -205,7 +214,7 @@ def remove_request(user, friend):
 @socketio.on("remove_friend")
 def remove_friend(user, friend):
     if not current_user.is_authenticated:
-        disconnect()
+        flask_socketio.disconnect()
     user_id = db.get_user_id(user)
     friend_id = db.get_user_id(friend)
     db.remove_friend(user_id, friend_id)

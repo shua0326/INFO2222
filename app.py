@@ -6,7 +6,7 @@ the socket event handlers are inside of socket_routes.py
 from functools import wraps
 from random import random, randint
 
-from flask import Flask, render_template, request, abort, url_for, jsonify, session, redirect
+from flask import Flask, render_template, request, abort, url_for, jsonify, session, redirect, make_response
 from markupsafe import escape
 from flask_login import LoginManager, current_user, login_user
 from flask_socketio import SocketIO
@@ -84,7 +84,9 @@ def login_the_user():
 
     login_user(user)    #authenticates the user, adding them to the connected users
 
-    return url_for('home', username=request.json.get("username"))   #redirects the user to the home page
+    resp = make_response(url_for('home', username=username))
+    resp.set_cookie('username', username, httponly=True)
+    return resp
 
 @app.route("/api/users/<string:username>/set_public_key", methods=["PUT"])
 def set_public_key(username):
@@ -95,7 +97,6 @@ def set_public_key(username):
 
     #ensuring a public key is provided
     if not public_key:
-        print("No public key provided")
         return jsonify({'error': 'Missing public key'}), 400
 
     user = current_user    #grabs the user object from the passed username
@@ -163,7 +164,8 @@ def signup_user():
     if db.get_user(username) is None:
         db.insert_user(id, username, db.hash(password), "")
         login_user(db.get_user(username))
-        return url_for('home', username=username)
+        resp = make_response(url_for('home', username=username))
+        return resp
     return "Error: User already exists!"
 
 
@@ -188,10 +190,9 @@ def home():
 @app.route("/logout")
 def logout():
     session.clear()
+
     return redirect(url_for('index'))
 
 if __name__ == '__main__':
-    # socketio.run(app)
-
     socketio.run(app, ssl_context=('./certs/mydomain.crt',
                                    './certs/mydomain.key'))

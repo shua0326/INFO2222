@@ -48,7 +48,6 @@ def add_friend(user_id: int, friend_id: int):
         friend = session.get(User, friend_id)
 
         if not user or not friend:
-            print("User or friend not found.")
             return
 
         # Add the friend to the user's list of friends
@@ -69,7 +68,6 @@ def add_friend_request(user_id: int, friend_id: int):
         friend = session.get(User, friend_id)
 
         if not user or not friend or user_id == friend_id:
-            print("User or friend not found.")
             return
         # Add the friend to the user's list of friends
         # This establishes the friendship in one direction
@@ -100,7 +98,6 @@ def remove_friend(user_id, friend_id):
         friend = session.get(User, friend_id)
 
         if not user or not friend:
-            print("User or friend not found.")
             return
         # Remove the friend from the user's list of friends
         # This breaks the friendship in one direction
@@ -153,7 +150,7 @@ def get_outgoing_friends_request(user_id: int):
                     list_to_send.append(i.username)
         return list_to_send
 
-def update_convo(convo_id, encrypted_message1, encrypted_message2, hmac):
+def update_convo(convo_id, encrypted_message1, encrypted_message2):
     with Session(engine) as session:
         #grabbing the corresponding encryptedconvo, encryptedconvo2, and hmac from the database
         result = session.query(Message).filter(Message.convo_id == convo_id).one_or_none()
@@ -161,10 +158,9 @@ def update_convo(convo_id, encrypted_message1, encrypted_message2, hmac):
             # If the convo_id exists, update the message, adding the delimiter
             result.encryptedconvo1 += "+++" + encrypted_message1
             result.encryptedconvo2 += "+++" + encrypted_message2
-            result.hmac = hmac
         else:
             # If the convo_id does not exist, insert a new record
-            new_message = Message(convo_id=convo_id, encryptedconvo1=encrypted_message1, encryptedconvo2=encrypted_message2, hmac=hmac)
+            new_message = Message(convo_id=convo_id, encryptedconvo1=encrypted_message1, encryptedconvo2=encrypted_message2)
             session.add(new_message)
         session.commit()
 
@@ -186,14 +182,6 @@ def get_to_disconnect_convos(user_id):
         # Create a dictionary where the keys are the convo_ids with the user_id removed and the values are the original convo_ids
         convos_dict = {str(convo[0]).replace(user_id_str, ''): str(convo[0]) for convo in convos_to_be_disconnected}
         return convos_dict
-
-def get_hmac(convo_id):
-    with Session(engine) as session:
-        result = session.query(Message).filter(Message.convo_id == convo_id).one_or_none()
-        if result:
-            return result.hmac
-        else:
-            return None
 
 def generate_convo_id(user_id1, user_id2):
     return f"{min(user_id1, user_id2)}{max(user_id1, user_id2)}"

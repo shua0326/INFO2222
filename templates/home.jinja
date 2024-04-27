@@ -183,13 +183,6 @@
 <script>
 
 
-
-    let init_room_id = 0;
-
-    let room_id = 0;
-
-    let glob_conversation = "";
-
     let current_receiver = "";
 
     let is_talking = false;
@@ -227,8 +220,6 @@
     // things get a bit complicated here so brace yourselves :P
     let username = "{{ username }}";
 
-    Cookies.set('username', username);
-
     // initializes the socket
     const socket = io();
 
@@ -251,6 +242,7 @@
 
     // an incoming message arrives, we'll add the message to the message box
     socket.on("incoming", async (user1, encryptedMsg, mac) => {  // Mark this function as async
+        console.log("i am receiving");
         if (user1 == username) {   // Ensure the message is meant for this user
             try {
                 const decryptedMessage = await decryptMessage(encryptedMsg);    //Decrypts the message using the user's private key
@@ -258,10 +250,8 @@
                     let mac_bytes = base64ToUint8Array(mac);
 
                     let status = await verify_hmac(decryptedMessage, mac_bytes); // Await HMAC verification
-                    console.log(decryptedMessage)
                     //Only add the message if the MAC verification passes
                     if (status) {
-                        await add_conversation(decryptedMessage);
                         await add_message_sys(decryptedMessage);
                     } else {
                         console.log("MAC verification failed.");
@@ -274,18 +264,10 @@
         }
     });
 
-    socket.on("init_room_id", async (init_id) => {
 
-        room_id = init_id;
-        init_room_id = init_id;
-        console.log(init_room_id);
-        Cookies.set("room_id", init_id);
-    })
-
-    socket.on("incoming_sys_init", async (encrypted_msg, macbase, room_id, color="black") => {
+    socket.on("incoming_sys_init", async (encrypted_msg, color="black") => {
         
         if (!encrypted_msg) {
-            Cookies.set("room_id", room_id);
             return;
         }
 
@@ -311,33 +293,20 @@
             decrypted_convo = decrypted_msgs.join("");
         }
         //conversation history is added to the global conversation
-        add_convo_init(decrypted_convo);
-        console.log(decrypted_convo);
-        let mac_bytes = base64ToUint8Array(macbase);
-        let status = await verify_hmac(decrypted_convo, mac_bytes);
 
-        if (status) {
-            await add_message_sys(decrypted_convo);
-        }
-        else {
-            console.log("Mac verification failed.");
-        }
-        Cookies.set("room_id", room_id);
+        await add_message_sys(decrypted_convo);
 
     });
 
     socket.on("incoming_sys_disconnect", () => {
-            console.log("bro has disconnected");
-            Cookies.set("room_id", room_id);
             leave();
             console.error("Your friend has disconnected.");
         })
 
 
     window.addEventListener("beforeunload", async function (event) {
-        socket.emit("user_disconnect", username, room_id);
+        socket.emit("user_disconnect", Cookies.get("username"));
         await leave();
-        Cookies.remove("room_id");
     });
 
 
@@ -368,9 +337,6 @@
             console.log('Error decrypting message:', e);
             throw new Error('Failed to decrypt message. Ensure the private key matches the public key used for encryption.');
         }
-        
-        console.log(decrypted);
-        console.log(decrypted.plaintext);
 
         if(decrypted.plaintext != undefined && decrypted.plaintext != ""){
             return decrypted.plaintext;
@@ -386,7 +352,6 @@
                 throw new Error(`Failed to fetch public key for user: ${receiver}`);
             }*/
             const data = await response.json();
-            console.log(data);
             return data.user_id;  // Assuming the backend sends the public key in this field
         } catch (error) {
             console.error("Fetching user id failed:", error);
@@ -448,10 +413,13 @@
             let macbase = arrayBufferToBase64(mac);
 
 
-            let current_room_id = Cookies.get("room_id");
-            console.log(current_room_id);
             // Emit the message over the socket
-            socket.emit("send", receiver, encryptedMessage.cipher, macbase, current_room_id);
+            socket.emit("send", receiver, encryptedMessage.cipher, macbase, res => {
+                if (res==false) {
+                    console.error("User not online.");
+                    return;
+                }
+            });
 
             // Add the formatted message to the user's chat window locally for immediate feedback
             await add_message(formattedMessage)
@@ -510,7 +478,6 @@
 
     // we emit a join room event to the server to join a room
     function join_room(friend) {
-        console.log("Joining room with: " + friend);
         current_receiver = friend;  //sets receiver to the friend you clicked on
         //pass in the receiver of our message to the server as well as the current user's username
         socket.emit("join", username, current_receiver, (res) => {
@@ -522,9 +489,6 @@
             }
 
             // set the room id variable to the room id returned by the server
-            room_id = res;
-            Cookies.set("room_id", room_id);
-
             // now we'll show the input box, so the user can input their message
             document.getElementById("chatting_to").innerHTML = "Chatting to: " + friend;    //updates the chatting to box
             $("#input_box").show();
@@ -535,10 +499,8 @@
     // function when the user clicks on "Leave Room"
     // emits a "leave" event, telling the server that we want to leave the room
     function leave() {
-        Cookies.remove("room_id");
-        Cookies.set("room_id", init_room_id);
-        clear_convo();
-        socket.emit("leave", username, init_room_id);
+        current_receiver = "";
+        socket.emit("leave", username);
         document.getElementById("chatting_to").innerHTML = "Chatting to: No one at the moment !";
         $("#input_box").hide();
         $("#message_box").empty();
@@ -560,31 +522,13 @@
     async function add_message(message, color) {
         let box = $("#message_box");
         // Replace newline characters with <br> tags
-        await add_conversation(message); //appends to global conversation variable
         await send_conversation(message);   //sends the encrypted message to the server
         let formatted_message=message.replace(/\n/g, '<br>');
         // Use .html() instead of .text() to interpret the <br> tags
         let child = $(`<p style="color:${color}; margin: 0px;"></p>`).html(formatted_message);
         box.append(child);  //adds the message to the box
-
-        
     }
 
-    function add_convo_init(message){
-        if (message != "" && message != "\n" && message != undefined) {
-            glob_conversation += message;
-        }
-    }
-
-    async function add_conversation(message) {
-        if (message != "" && message != "\n" && message != undefined) {
-            glob_conversation += (message + "\n");
-        }
-    }
-
-    function clear_convo() {
-        glob_conversation = "";
-    }
 
     async function send_conversation(conversation) {
         let sender = current_receiver   //Gets the current receiver
@@ -613,8 +557,6 @@
         let encrypted_conversation1 = "";
         let encrypted_conversation2 = "";
 
-        let mac = await generate_hmac(glob_conversation);  // Generate HMAC for the entirety of the conversation history
-        let macbase = arrayBufferToBase64(mac);
 
         //creates two encrypted messages, one for each user
         encrypted_conversation1 = cryptico.encrypt(conversation, pubkey1);
@@ -623,13 +565,13 @@
         encrypted_conversation2 = encrypted_conversation2.cipher;
 
         //sends the encrypted conversations to the server
-        socket.emit("send_convo", encrypted_conversation1, encrypted_conversation2, macbase, username, sender);
+        socket.emit("send_convo", encrypted_conversation1, encrypted_conversation2, username, sender);
     }
 
     // Logout function
     async function logout() {
         // Redirect to the logout rout
-        socket.emit("user_disconnect", username, room_id, function(response) {
+        socket.emit("user_disconnect", function(response) {
             if (response) {
                 window.location.href = "/logout";
             }
@@ -652,6 +594,7 @@
 
     }
 
+    //sends requests to the server for these functionalities
     function add_friend(friend) {
         socket.emit("add_friend", username, friend);
     }
@@ -664,6 +607,7 @@
         socket.emit("reject_request", username, friend);
     }
 
+    //dynamically updates html to do with friends
     function updateIncomingRequests(requests) {
         const container = document.querySelector('.Incoming_Friends_Request');
         container.innerHTML = '<h2>Friend Requests</h2>';  // Clear content and add header

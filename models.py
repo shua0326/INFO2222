@@ -69,7 +69,6 @@ class Message(Base):
     convo_id = Column(Integer, primary_key=True)
     encryptedconvo1 = Column(String)
     encryptedconvo2 = Column(String)
-    hmac = Column(String)
 
 class Counter():
     def __init__(self):
