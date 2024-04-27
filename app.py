@@ -191,7 +191,7 @@ def logout():
     return redirect(url_for('index'))
 
 if __name__ == '__main__':
-    socketio.run(app)
+    # socketio.run(app)
 
-    #socketio.run(app, ssl_context=('./certs/mydomain.crt',
-                                #    './certs/mydomain.key'))
+    socketio.run(app, ssl_context=('./certs/mydomain.crt',
+                                   './certs/mydomain.key'))
