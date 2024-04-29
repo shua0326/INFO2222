@@ -32,8 +32,6 @@ friends_request = Table(
     Column('friend_id', Integer, ForeignKey('user.id'), primary_key=True)
 )
 
-
-
 # model to store user information
 class User(UserMixin, Base):
     __tablename__ = "user"
@@ -68,6 +66,12 @@ class Message(Base):
     convo_id = Column(Integer, primary_key=True)
     encryptedconvo1 = Column(String)
     encryptedconvo2 = Column(String)
+
+class Staff(Base):
+    __tablename__ = 'uni_staff_db'
+    staff_id = Column(Integer, primary_key=True)
+    staff_role = Column(String)
+    staff_code = Column(String)
 
 class Counter():
     def __init__(self):
@@ -105,4 +109,6 @@ class Room():
         if user not in self.dict.keys():
             return None
         return self.dict[user]
+
+
     

@@ -209,10 +209,8 @@ def hash(plain_password):
 
 #checks whether the password matches after hashing
 def checkpassword(plain_password, hashed_password):
-    #uses the bcrypt checkpw to check password (returns true or false)
-    #need to convert the password first to an array of bytes
-    plain_password = plain_password.encode('utf-8')
-    return bcrypt.checkpw(plain_password, hashed_password)
+    # Decode hashed_password if it's a bytes object
+    return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password)
 
 #removes spaces and lowercases username
 def format_username(username):
@@ -246,6 +244,23 @@ def get_user_role(user_id):
     with Session(engine) as session:
         user = session.query(User).filter(User.id == user_id).first()
         return user.user_role if user else None
+
+# Check staff code function
+def check_staff_code(staff_id:int, user_code:str, user_role:str):
+    with Session(engine) as session:
+        with Session(engine) as session:
+            result = session.query(Staff).filter(Staff.staff_id == staff_id).filter(Staff.staff_role == user_role).first()
+        check_result = checkpassword(user_code, result.staff_code)
+        return check_result if result else False
+
+# inserts staff to the database
+def insert_staff(id:int, staff_role: str, staff_code: str):
+    with Session(engine) as session:
+        staff = Staff(staff_id=id, staff_role=staff_role, staff_code=staff_code)
+        session.add(staff)
+        session.commit()
+
+# insert_staff(1, "Academic", hash("1"))
     
       
 from sqlalchemy import create_engine

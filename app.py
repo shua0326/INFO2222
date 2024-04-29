@@ -143,14 +143,23 @@ def signup_user():
     username_input = request.json.get("username")
     password_input = request.json.get("password")
     role_input = request.json.get("role")
+    user_code = request.json.get("user_code")
+    staff_id = request.json.get("staff_id")
     username = escape(username_input)
     password = escape(password_input)
     role_input = escape(role_input)
+    user_code = str(escape(user_code))
+    staff_id = int(escape(staff_id))
 
     #creates a unique id for the user
     id = randint(1000000, 9999999)
     while db.get_id(id) is not None:
         id = randint(1000000, 9999999)
+    
+    #ensures the user code is correct they are not a student
+    if role_input != "Student":
+        if db.check_staff_code(staff_id, user_code, role_input) == False:
+            return "Error: Staff code is incorrect!"
 
     #ensures the case is not a factor for the username, and removes accidental spaces in the username
     username = db.format_username(username)

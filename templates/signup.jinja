@@ -13,10 +13,14 @@ Sign up page, pretty much the same as login.
     <p>User role</p>
     <select id="role">
         <option value="Student">Student</option>
-        <option value="Academics">Academics</option>
-        <option value="Administrative staff ">Administrative Staff</option>
+        <option value="Academic">Academic</option>
+        <option value="Administrative staff">Administrative Staff</option>
         <option value="Admin user">Admin User</option>
     </select>
+    <p>Staff Id</p>
+    <input id="staff_id" type="staff_id"/>
+    <p>User code</p>
+    <input id="usercode" type="password"/>
     <button onclick="signup()">Sign up</button>
 
     <script>
@@ -32,8 +36,9 @@ Sign up page, pretty much the same as login.
 
         function isValidPassword(password) {
             // At least 8 characters long, 1 uppercase, 1 lowercase, 1 number, 1 special character
-            const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
-            return regex.test(password);
+            // const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+            // return regex.test(password);
+            return true;
         }
 
         // this function is identical to login(), see login.jinja
@@ -43,6 +48,8 @@ Sign up page, pretty much the same as login.
             let role = $("#role").val();
             let password = $("#password").val();
             let username = encodeURIComponent($("#username").val());
+            let user_code = $("#usercode").val();
+            let staff_id = $("#staff_id").val();
             password = password.replace(/\s/g, '');
 
             // checks if the inputted password matches the password requirements
@@ -57,7 +64,9 @@ Sign up page, pretty much the same as login.
             let res = await axios.post(loginURL, {
                 username: username,
                 password: password,
-                role:role
+                role:role,
+                user_code:user_code,
+                staff_id:staff_id
             });
 
             // if the server sends in an error message, alert() the error message

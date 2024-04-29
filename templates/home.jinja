@@ -565,7 +565,7 @@
     // Logout function
     async function logout() {
         // Redirect to the logout rout
-        socket.emit("user_disconnect", function(response) {
+        socket.emit("user_disconnect", Cookies.get("username"), function(response) {
             if (response) {
                 window.location.href = "/logout";
             }
