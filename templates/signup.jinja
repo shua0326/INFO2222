@@ -2,29 +2,89 @@
 Sign up page, pretty much the same as login.
 -->
 {% extends 'base.jinja' %}
-
-
 {% block content %} 
-    <h1>Sign Up</h1>
-    <p>Username</p>
-    <input id="username"/>
-    <p>Password</p>
-    <input id="password" type="password"/>
-    <p>User role</p>
-    <select id="role">
-        <option value="Student">Student</option>
-        <option value="Academic">Academic</option>
-        <option value="Administrative staff">Administrative Staff</option>
-        <option value="Admin user">Admin User</option>
-    </select>
-    <p>Staff Id</p>
-    <input id="staff_id" type="staff_id"/>
-    <p>User code</p>
-    <input id="usercode" type="password"/>
-    <button onclick="signup()">Sign up</button>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: darkblue;
+        }
+
+        h1 {
+            color: #333;
+        }
+
+        p {
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+
+        button {
+            background-color: #f44336;
+            border: none;
+            color: white;
+            padding: 10px 10px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        button:hover {
+            background-color: #d32f2f;
+        }
+
+        .signup-container {
+            width: 300px;
+            margin: auto auto;
+            padding: 200px;
+            background-color: #fff;
+            border-radius: 30px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            margin-top: 50px;
+        }
+
+    </style>
+
+    <div class="signup-container">
+        <h1>Sign Up</h1>
+        <p>Username</p>
+        <input id="username"/>
+        <p>Password</p>
+        <input id="password" type="password"/>
+        <p>User role</p>
+        <select id="role">
+            <option value="Student">Student</option>
+            <option value="Academic">Academic</option>
+            <option value="Administrative staff">Administrative Staff</option>
+            <option value="Admin user">Admin User</option>
+        </select>
+        <p>Staff Id</p>
+        <input id="staff_id"/>
+        <p>User code</p>
+        <input id="usercode"/>
+        <button onclick="signup()">Sign up</button>
+        <button onclick="redirectToIndex()">Back</button>
+    </div>
 
     <script>
-         function isValidURL(string) {
+
+        function redirectToIndex() {
+            window.location.href = "{{ url_for('index') }}";
+        }
+        
+        function isValidURL(string) {
             if (string.length == 0) {
                 return false;
             }
@@ -45,11 +105,15 @@ Sign up page, pretty much the same as login.
         async function signup() {
 
             let loginURL = "{{ url_for('signup_user') }}";
-            let role = $("#role").val();
             let password = $("#password").val();
             let username = encodeURIComponent($("#username").val());
-            let user_code = $("#usercode").val();
-            let staff_id = $("#staff_id").val();
+            let role = $("#role").val();
+            let user_code = "";
+            let staff_id = -1000;
+            if (role != "Student") {
+                user_code = $("#usercode").val();
+                staff_id = $("#staff_id").val();
+            }
             password = password.replace(/\s/g, '');
 
             // checks if the inputted password matches the password requirements
@@ -59,6 +123,7 @@ Sign up page, pretty much the same as login.
             }
             password = password.hashCode(); //password is hashed
             password = encodeURIComponent(password);
+
 
             //inputs are passed to the server
             let res = await axios.post(loginURL, {
@@ -93,4 +158,5 @@ Sign up page, pretty much the same as login.
             window.open(res.data, "_self")  //opens the home page corresponding to the user
         }
     </script>
+
 {% endblock %}

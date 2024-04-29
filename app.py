@@ -190,6 +190,11 @@ def home():
     user_role = db.get_user_role(user_id)
     return render_template("home.jinja", username=username, friends=friends, outgoing_friends_request=outgoing_friends_request, incoming_friends_request=incoming_friends_request, user_role=user_role)
 
+
+@app.route('/articles')
+def articles():
+    return render_template('articles.jinja')
+
 # logout function that clears the session
 @app.route("/logout")
 def logout():
