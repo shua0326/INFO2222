@@ -248,10 +248,10 @@ def get_user_role(user_id):
 # Check staff code function
 def check_staff_code(staff_id:int, user_code:str, user_role:str):
     with Session(engine) as session:
-        with Session(engine) as session:
-            result = session.query(Staff).filter(Staff.staff_id == staff_id).filter(Staff.staff_role == user_role).first()
-        check_result = checkpassword(user_code, result.staff_code)
-        return check_result if result else False
+        result = session.query(Staff).filter_by(staff_id=staff_id, staff_role=user_role).first()
+        if result is None or not checkpassword(user_code, result.staff_code):
+            return False
+        return True
 
 # inserts staff to the database
 def insert_staff(id:int, staff_role: str, staff_code: str):
@@ -260,8 +260,12 @@ def insert_staff(id:int, staff_role: str, staff_code: str):
         session.add(staff)
         session.commit()
 
-# insert_staff(1, "Academic", hash("1"))
-    
+try:
+    insert_staff(2, "Administrative staff", hash("2"))
+    insert_staff(3, "Admin user", hash("3"))
+    insert_staff(1, "Academic", hash("1"))
+except:
+    pass
       
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session

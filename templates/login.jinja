@@ -5,13 +5,77 @@
 {% extends 'base.jinja' %}
 
 {% block content %} 
-    <h1>Login</h1>
-    <p>Username</p>
-    <input id="username"/>
-    <p>Password</p>
-    <input id="password"  type="password"/>
-    <button onclick="login()">Login</button>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: darkblue;
+        }
+
+        h1 {
+            color: #333;
+        }
+
+        p {
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+
+        button {
+            background-color: #f44336;
+            border: none;
+            color: white;
+            padding: 10px 10px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        button:hover {
+            background-color: #d32f2f;
+        }
+
+        .signup-container {
+            width: 300px;
+            margin: auto auto;
+            padding: 150px;
+            background-color: #fff;
+            border-radius: 30px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            margin-top: 100px;
+        }
+
+    </style>
+
+    <div class="signup-container">
+        <h1>Login</h1>
+        <p>Username</p>
+        <input id="username"/>
+        <p>Password</p>
+        <input id="password"  type="password"/>
+        <button onclick="login()">Login</button>
+        <button onclick="redirectToIndex()">Back</button>
+    </div>
+    
+    
     <script>
+
+        // Go back to index
+        function redirectToIndex() {
+            window.location.href = "{{ url_for('index') }}";
+        }
 
         //checks if URL sent by server is not an error message
         function isValidURL(string) {

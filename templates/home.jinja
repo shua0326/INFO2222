@@ -10,20 +10,21 @@
         font-family: Arial, sans-serif;
         margin: 0;
         padding: 0;
-        background-color: #f4f4f4;
+        background-color: darkblue;
     }
 
     .main {
         display: flex;
         justify-content: space-between;
-        margin: 20px;
+        margin: 50px;
+        height: 600px;
     }
 
     .Chat {
         flex: 4; /* Takes up 3/4 of the space */
-        margin-right: 20px;
+        margin: 0px 30px;
         background-color: #fff;
-        padding: 20px;
+        padding: 30px 30px;
         border-radius: 10px;
         box-shadow: 0px 0px 5px 0px rgba(0,0,0,0.15);
     }
@@ -32,19 +33,17 @@
         flex: 1; /* Takes up 1/4 of the space */
         background-color: #fff;
         padding: 20px;
-        margin-right: 20px;
+        margin: 0px 20px;
         border-radius: 10px;
         box-shadow: 0px 0px 5px 0px rgba(0,0,0,0.15);
     }
 
     #message_box {
         border: 1px solid #ddd;
-        height: 400px;
+        height: 450px;
         width: 100%;
-        overflow: auto;
-        padding: 10px;
-        margin-bottom: 20px;
         border-radius: 5px;
+        justify-self: center;
     }
 
     .text {
@@ -53,11 +52,12 @@
 
     nav {
         display: flex;
-        justify-content: flex-end;
+        justify-content: space-between;
         background-color: #333;
         color: #fff;
         padding: 0.2em 1em;
         font-size: 1.5em;
+        text-align: center;
     }
 
     button {
@@ -85,14 +85,15 @@
 
     h1 {
         text-align: left;
-        padding-left: 20px;
-        color: blue;
+        color: white;
         margin: 20px 0;
+        margin-left: 70px;
     }
 
     nav ol li {
         display: inline-block;
         margin-right: 20px;
+
     }
 
     .Friends_button {
@@ -146,16 +147,34 @@
         margin: 10px 0;
     }
 
+    a {
+        background-color: #f44336;
+        border: none;
+        color: white;
+        padding: 10px 10px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 16px;
+        cursor: pointer;
+        border-radius: 4px;
+    }
+    
+    a:hover {
+        background-color: #d32f2f;
+    }
+
 </style>
 
 <nav>
+    <h1>Messaging App </h1>
     <ol>
         <li><b>Username:</b>  {{ username }} - {{user_role}}</li>
         <li><button onclick="(async () => { await logout(); })()">Logout</button></li>
+        <li><a href={{ url_for('articles') }}>Articles</a></li>
     </ol>
 </nav>
 
-<h1>Messaging App </h1>
 <main class="main">
     <div class="Chat">
         <h3><div id="chatting_to">Chatting to: No one at the moment !</div></h3>
@@ -169,7 +188,7 @@
 
         <style>
             button:disabled {
-                background-color: #cccccc;
+                background-color: #010000;
                 color: #666666;
             }
         </style>
