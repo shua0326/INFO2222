@@ -28,25 +28,7 @@
         box-shadow: 0px 0px 5px 0px rgba(0,0,0,0.15);
     }
 
-    .Friends {
-        flex: 1; /* Takes up 1/4 of the space */
-        background-color: #fff;
-        padding: 20px;
-        margin-right: 20px;
-        border-radius: 10px;
-        box-shadow: 0px 0px 5px 0px rgba(0,0,0,0.15);
-    }
-
-    .Incoming_Friends_Request {
-        flex: 1; /* Takes up 1/4 of the space */
-        background-color: #fff;
-        padding: 20px;
-        margin-right: 20px;
-        border-radius: 10px;
-        box-shadow: 0px 0px 5px 0px rgba(0,0,0,0.15);
-    }
-
-    .Outgoing_Friends_Request {
+    #Small_box {
         flex: 1; /* Takes up 1/4 of the space */
         background-color: #fff;
         padding: 20px;
@@ -119,6 +101,46 @@
         margin: 10px 0;
     }
 
+    .List_friend_button {
+        background-color: white;
+        color: black;
+        border: none;
+        padding: 10px 10px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 18px;
+        font-weight: bold;
+        cursor: pointer;
+        border-radius: 4px;
+    }
+
+    .List_friend_button:hover {
+        background-color: white;
+        color: black;
+    }
+
+    .Cancel_button {
+        background-color: #bf1c1c;
+        color: white;
+        margin: 10px 0;
+    }
+
+    .Cancel_button:hover {
+        background-color: #b01a1a;
+        color: white;
+    }
+
+    .Accept_button {
+        background-color: #4CAF50;
+        color: white;
+        margin: 10px 0;
+    }
+
+    .Accept_button:hover {
+        background-color: #3f9643;
+    }
+
     .button-container {
         display: block;
         margin: 10px 0;
@@ -126,25 +148,18 @@
 
 </style>
 
-<!--Navbar, you'll see the username here-->
 <nav>
     <ol>
-        <li><b>Username:</b>  {{ username }} </li>
+        <li><b>Username:</b>  {{ username }} - {{user_role}}</li>
         <li><button onclick="(async () => { await logout(); })()">Logout</button></li>
     </ol>
 </nav>
 
 <h1>Messaging App </h1>
 <main class="main">
-
-
     <div class="Chat">
         <h3><div id="chatting_to">Chatting to: No one at the moment !</div></h3>
-        <!-- The messages are displayed here -->
         <section id="message_box"></section>
-
-        <!-- The (message) input box is set to display: none initially,
-        this means the input box is "invisible" initially-->
         <section id="input_box" style="display: none" >
             <p class="text">Message: </p>
             <input class="receiver" id="message" placeholder="message" oninput="checkInput()">
@@ -161,20 +176,11 @@
 
     </div>
 
-    <div class="Incoming_Friends_Request">
-        <h2>Friend Requests</h2>
+    <div class="Incoming_Friends_Request" id="Small_box"> </div>
 
-    </div>
+    <div class="Outgoing_Friends_Request" id="Small_box"> </div>
 
-    <div class="Outgoing_Friends_Request">
-        <h2>Friend Requests Sent</h2>
-
-    </div>
-
-    <div class="Friends">
-        <h2>Friends List</h2>
-
-    </div>
+    <div class="Friends" id="Small_box"> </div>
 
 </main>
 
@@ -182,14 +188,8 @@
 <script src="/static/js/libs/socket.io.min.js"></script>
 <script>
 
-
     let current_receiver = "";
-
     let is_talking = false;
-
-
-
-
 
     // when the user presses the "Enter" key inside of the "message box",
     // the message is sent to the server
@@ -208,16 +208,11 @@
     })
 
     $(document).ready(() => {
-        // Call checkInput initially to set the correct state of the "Send" button
         checkInput();
-
-        // Call checkInput whenever the value of the input box changes
         $("#message").on("input change paste", checkInput);
-        // ...
     });
 
     // Here's the Socket IO part of the code
-    // things get a bit complicated here so brace yourselves :P
     let username = "{{ username }}";
 
     // initializes the socket
@@ -263,7 +258,6 @@
             }
         }
     });
-
 
     socket.on("incoming_sys_init", async (encrypted_msg, color="black") => {
         
@@ -616,8 +610,9 @@
         } else {
             requests.forEach(request => {
                 container.innerHTML += `<div class="button-container">
-                    <button class="Friends_button">${request}</button> <button onclick="add_friend('${request}')">Accept</button>
-                    <button onclick="reject_request('${request}')">Decline</button>
+                    <button class="List_friend_button">- ${request}</button> 
+                    <button class="Accept_button" onclick="add_friend('${request}')">Accept</button>
+                    <button class="Cancel_button" onclick="reject_request('${request}')">Decline</button>
                 </div>`;
             });
         }
@@ -631,8 +626,8 @@
         } else {
             requests.forEach(request => {
                 container.innerHTML += `<div class="button-container">
-                    <button class="Friends_button">${request}</button>
-                    <button class="Friends_button" onclick="remove_request('${request}')">Cancel Request</button>
+                    <button class="List_friend_button">- ${request}</button>
+                    <button class="Cancel_button" onclick="remove_request('${request}')">Cancel Request</button>
                 </div>`;
             });
         }
@@ -647,7 +642,7 @@
             friends.forEach(friend => {
                 container.innerHTML += `<div class="button-container">
                     <button onclick="open_chat('${friend}')" class="Friends_button">${friend}</button>
-                    <button class="Friends_button" onclick="remove_friend('${friend}')">Remove</button>
+                    <button class="Cancel_button" onclick="remove_friend('${friend}')">Remove</button>
                 </div>`;
             });
         }

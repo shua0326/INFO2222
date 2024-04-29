@@ -14,18 +14,15 @@ from pathlib import Path
 Path("database") \
     .mkdir(exist_ok=True)
 
-# "database/main.db" specifies the database file
-# change it if you wish
-# turn echo = True to display the sql output
 engine = create_engine("sqlite:///database/main.db", echo=True)
 
 # initializes the database
 Base.metadata.create_all(engine)
 
 # inserts a user to the database
-def insert_user(id:int, username: str, password: str, pubkey: str):
+def insert_user(id:int, username: str, password: str, pubkey: str, role: str):
     with Session(engine) as session:
-        user = User(id=id, username=username, password=password, pubkey=pubkey)
+        user = User(id=id, username=username, password=password, pubkey=pubkey, user_role=role)
         session.add(user)
         session.commit()
 
@@ -35,11 +32,13 @@ def get_user(username: str):
         user = session.query(User).filter_by(username=username).first()
         return user
 
+# gets a user_name from the database
 def get_username(user_id: int):
     with Session(engine) as session:
         user = session.query(User).filter_by(id=user_id).first()
         return user.username
 
+# add friend function
 def add_friend(user_id: int, friend_id: int):
     # Create a new session
     with Session(engine) as session:
@@ -59,7 +58,8 @@ def add_friend(user_id: int, friend_id: int):
 
         # Commit the transaction to save changes to the database
         session.commit()
-        
+
+# Add friend request function   
 def add_friend_request(user_id: int, friend_id: int):
     # Create a new session
     with Session(engine) as session:
@@ -90,7 +90,8 @@ def get_friends(user_id: int):
             for friend in user.friends:
                 list_to_send.append(friend.username)
         return list_to_send
-    
+
+# Remove friend function 
 def remove_friend(user_id, friend_id):
     with Session(engine) as session:
         # Get the user and friend from the database
@@ -106,7 +107,8 @@ def remove_friend(user_id, friend_id):
         friend.friends.remove(user)
         # Commit the transaction to save changes to the database
         session.commit()
-    
+
+# Remove friend request function
 def remove_request(friend_id, user_id):
     with Session(engine) as session:
         # Get the user and friend from the database
@@ -132,7 +134,8 @@ def get_incoming_friends_request(user_id: int):
         user_names = session.execute(stmt)
         user_names_lst = [row[0] for row in user_names.fetchall()]
         return user_names_lst
-    
+
+# Get outgoing friend requests
 def get_outgoing_friends_request(user_id: int):
     # Create a new session
     with Session(engine) as session:
@@ -150,6 +153,7 @@ def get_outgoing_friends_request(user_id: int):
                     list_to_send.append(i.username)
         return list_to_send
 
+# Update convo function
 def update_convo(convo_id, encrypted_message1, encrypted_message2):
     with Session(engine) as session:
         #grabbing the corresponding encryptedconvo, encryptedconvo2, and hmac from the database
@@ -164,6 +168,7 @@ def update_convo(convo_id, encrypted_message1, encrypted_message2):
             session.add(new_message)
         session.commit()
 
+# Get convo function
 def get_convo(convo_id, row):
     with Session(engine) as session:
         result = session.query(Message).filter(Message.convo_id == convo_id).one_or_none()
@@ -174,7 +179,8 @@ def get_convo(convo_id, row):
                 return result.encryptedconvo2
         else:
             return None
-
+        
+# Disconnect convo function
 def get_to_disconnect_convos(user_id):
     with Session(engine) as session:
         user_id_str = str(user_id)
@@ -183,9 +189,11 @@ def get_to_disconnect_convos(user_id):
         convos_dict = {str(convo[0]).replace(user_id_str, ''): str(convo[0]) for convo in convos_to_be_disconnected}
         return convos_dict
 
+# Generate convo id function
 def generate_convo_id(user_id1, user_id2):
     return f"{min(user_id1, user_id2)}{max(user_id1, user_id2)}"
 
+# Set user public key function
 def set_user_public_key(user_id, public_key):
     with Session(engine) as session:
         user = session.query(User).filter(User.id == user_id).first()
@@ -217,25 +225,31 @@ def format_password(password):
     password = password.strip()
     return password
 
-
 # Get user id function
 def get_user_id(username):
     user = get_user(username)
     return user.id if user else None
 
+# Get user public key function
 def get_user_public_key(user_id):
     with Session(engine) as session:
         user = session.query(User).get(user_id)
         return user.pubkey if user else None
 
+# Get get id function
 def get_id(id: int):
     with Session(engine) as session:
         return session.get(User, id)
+    
+# Get user role function
+def get_user_role(user_id):
+    with Session(engine) as session:
+        user = session.query(User).filter(User.id == user_id).first()
+        return user.user_role if user else None
+    
+      
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from models import *
-
 from pathlib import Path
-
-# creates the database directory
 

@@ -47,8 +47,7 @@ class User(UserMixin, Base):
     username: Mapped[str] = mapped_column(String, unique=True)
     password: Mapped[str] = mapped_column(String)
     pubkey: Mapped[str] = Column(String)
-
-
+    user_role: Mapped[str] = Column(String)
 
     friends = relationship("User",
                            secondary=friends_association,

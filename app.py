@@ -5,7 +5,6 @@ the socket event handlers are inside of socket_routes.py
 '''
 from functools import wraps
 from random import random, randint
-
 from flask import Flask, render_template, request, abort, url_for, jsonify, session, redirect, make_response
 from markupsafe import escape
 from flask_login import LoginManager, current_user, login_user
@@ -21,15 +20,12 @@ import secrets
 app = Flask(__name__)
 login_manager = LoginManager()
 login_manager.init_app(app)
-# secret key used to sign the session cookie
 app.config['SECRET_KEY'] = secrets.token_hex()
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SECURE'] = True  # Ensure you are using HTTPS
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # Can be set to 'Strict' or 'Lax'
 socketio = SocketIO(app)
 
-
-# don't remove this!!
 import socket_routes
 
 def login_required(f):
@@ -60,7 +56,6 @@ def login_the_user():
 
     if not request.is_json:
         abort(404)
-
     username_input = request.json.get("username")
     password_input = request.json.get("password")
     username = escape(username_input)
@@ -81,15 +76,14 @@ def login_the_user():
     password = str(password)
     if db.checkpassword(password, user.password) == False:
         return "Error: Password does not match!"
-
     login_user(user)    #authenticates the user, adding them to the connected users
-
     resp = make_response(url_for('home', username=username))
     resp.set_cookie('username', username, httponly=True)
     return resp
 
 @app.route("/api/users/<string:username>/set_public_key", methods=["PUT"])
 def set_public_key(username):
+    
     #grabs the public key from the json request, escaping any special characters
     data = request.json
     public_key_input = data.get('public_key')
@@ -148,8 +142,10 @@ def signup_user():
     #retrieves the username and password from the json request, escaping any special characters
     username_input = request.json.get("username")
     password_input = request.json.get("password")
+    role_input = request.json.get("role")
     username = escape(username_input)
     password = escape(password_input)
+    role_input = escape(role_input)
 
     #creates a unique id for the user
     id = randint(1000000, 9999999)
@@ -162,13 +158,11 @@ def signup_user():
 
     #inserts the user into the database if a user of the same username has not already been created
     if db.get_user(username) is None:
-        db.insert_user(id, username, db.hash(password), "")
+        db.insert_user(id, username, db.hash(password), "", role_input)
         login_user(db.get_user(username))
-        resp = make_response(url_for('home', username=username))
+        resp = make_response(url_for('home', username=username, role=role_input))
         return resp
     return "Error: User already exists!"
-
-
 
 # handler when a "404" error happens
 @app.errorhandler(404)
@@ -184,15 +178,15 @@ def home():
     friends = db.get_friends(user_id)
     outgoing_friends_request = db.get_outgoing_friends_request(user_id)
     incoming_friends_request = db.get_incoming_friends_request(user_id)
-    return render_template("home.jinja", username=username, friends=friends, outgoing_friends_request=outgoing_friends_request, incoming_friends_request=incoming_friends_request)
+    user_role = db.get_user_role(user_id)
+    return render_template("home.jinja", username=username, friends=friends, outgoing_friends_request=outgoing_friends_request, incoming_friends_request=incoming_friends_request, user_role=user_role)
 
 # logout function that clears the session
 @app.route("/logout")
 def logout():
     session.clear()
-
     return redirect(url_for('index'))
 
 if __name__ == '__main__':
-    socketio.run(app, ssl_context=('./certs/mydomain.crt',
-                                   './certs/mydomain.key'))
+    socketio.run(app)
+    # socketio.run(app, ssl_context=('./certs/mydomain.crt', './certs/mydomain.key'))
