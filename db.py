@@ -154,29 +154,25 @@ def get_outgoing_friends_request(user_id: int):
         return list_to_send
 
 # Update convo function
-def update_convo(convo_id, encrypted_message1, encrypted_message2):
+def update_convo(convo_id, user_id, encrypted_message):
     with Session(engine) as session:
-        #grabbing the corresponding encryptedconvo, encryptedconvo2, and hmac from the database
-        result = session.query(Message).filter(Message.convo_id == convo_id).one_or_none()
+        # Grabbing the corresponding encrypted_message from the database
+        result = session.query(Message).filter(Message.convo_id == convo_id, Message.user_id == user_id).one_or_none()
         if result:
-            # If the convo_id exists, update the message, adding the delimiter
-            result.encryptedconvo1 += "+++" + encrypted_message1
-            result.encryptedconvo2 += "+++" + encrypted_message2
+            # If the convo_id and user_id exist, update the message, adding the delimiter
+            result.encrypted_convo += "+++" + encrypted_message
         else:
-            # If the convo_id does not exist, insert a new record
-            new_message = Message(convo_id=convo_id, encryptedconvo1=encrypted_message1, encryptedconvo2=encrypted_message2)
+            # If the convo_id and user_id do not exist, insert a new record
+            new_message = Message(convo_id=convo_id, user_id=user_id, encrypted_convo=encrypted_message)
             session.add(new_message)
         session.commit()
 
 # Get convo function
-def get_convo(convo_id, row):
+def get_convo(convo_id, user_id):
     with Session(engine) as session:
-        result = session.query(Message).filter(Message.convo_id == convo_id).one_or_none()
+        result = session.query(Message).filter(Message.convo_id == convo_id, Message.user_id == user_id).one_or_none()
         if result:
-            if row == "encryptedconvo1":
-                return result.encryptedconvo1
-            elif row == "encryptedconvo2":
-                return result.encryptedconvo2
+            return result.encrypted_convo
         else:
             return None
         

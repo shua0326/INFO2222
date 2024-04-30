@@ -256,7 +256,7 @@
 
     // an incoming message arrives, we'll add the message to the message box
     socket.on("incoming", async (user1, encryptedMsg, mac) => {  // Mark this function as async
-        console.log("i am receiving");
+      
         if (user1 == username) {   // Ensure the message is meant for this user
             try {
                 const decryptedMessage = await decryptMessage(encryptedMsg);    //Decrypts the message using the user's private key
@@ -284,13 +284,18 @@
             return;
         }
 
+     
+
         const encrypted_convo = encrypted_msg.split("+++").filter(msg => msg.trim() !== "");  // Split and filter out empty results
         const decrypted_msgs = [];
+  
 
         //decrypting conversation messages
         for (let msg of encrypted_convo) {
             if (msg) {  // Check if the message is not undefined or empty
+          
                 const decrypted = await decryptMessage(msg);
+               
                 if (decrypted) {
                     if (decrypted.trim() !== "" && decrypted.trim() != "\n") {  // Ensure the decrypted message isn't empty or just whitespace
                         decrypted_msgs.push(decrypted);  // Add it to the array
@@ -299,6 +304,8 @@
 
             }
         }
+
+     
 
         //joins the decrypted messages into one string
         let decrypted_convo = '';
@@ -333,6 +340,7 @@
         const passphrase = await getData();
         const serial_privkey = await getRSAKey(passphrase);
         const privateKey = importRSAKey(serial_privkey);
+   
 
 
 
@@ -346,6 +354,7 @@
         let decrypted;
         try {
             decrypted = await cryptico.decrypt(encryptedMessage, privateKey);
+            
         } catch (e) {
             console.log('Error decrypting message:', e);
             throw new Error('Failed to decrypt message. Ensure the private key matches the public key used for encryption.');
@@ -426,13 +435,8 @@
             let macbase = arrayBufferToBase64(mac);
 
 
-            // Emit the message over the socket
-            socket.emit("send", receiver, encryptedMessage.cipher, macbase, res => {
-                if (res==false) {
-                    console.error("User not online.");
-                    return;
-                }
-            });
+            // Emit the message over the sockets
+            socket.emit("send", receiver, encryptedMessage.cipher, macbase);
 
             // Add the formatted message to the user's chat window locally for immediate feedback
             await add_message(formattedMessage)
@@ -544,44 +548,30 @@
 
 
     async function send_conversation(conversation) {
-        let sender = current_receiver   //Gets the current receiver
-        conversation += "\n";   //Adds a newline character to the end of the message
-        const username_id = await fetchUserid(username);    //Fetches the user id of the current user
-        const sender_id = await fetchUserid(sender);    //Fetches the user id of the sender
-
-        //determines which user is user1 and which is user2
-        var user1;
-        var user2;
-        if(username_id && sender_id) {
-            if (username_id > sender_id) {
-                user1 = username;
-                user2 = sender;
-            }
-            else {
-                user1 = sender;
-                user2 = username;
-            }
-        }
-
+        let receiver = current_receiver   //Gets the current receiver
+        conversation += "\n";   //Adds a newline character to the end of the messages
         //grabs public keys of user to encrypt
-        const pubkey1 = await fetchPublicKey(user1);
-        const pubkey2 = await fetchPublicKey(user2);
+        const receiver_pubkey = await fetchPublicKey(receiver);
+        const sender_pubkey = await fetchPublicKey(username);
 
-        let encrypted_conversation1 = "";
-        let encrypted_conversation2 = "";
+
+        let encrypted_conversation_receiver = "";
+        let encrypted_conversation_sender = "";
 
 
         //creates two encrypted messages, one for each user
-        encrypted_conversation1 = cryptico.encrypt(conversation, pubkey1);
-        encrypted_conversation2 = cryptico.encrypt(conversation, pubkey2);
-        encrypted_conversation1 = encrypted_conversation1.cipher;
-        encrypted_conversation2 = encrypted_conversation2.cipher;
+        encrypted_conversation_receiver = cryptico.encrypt(conversation, receiver_pubkey);
+        encrypted_conversation_sender = cryptico.encrypt(conversation, sender_pubkey);
+        encrypted_conversation_receiver = encrypted_conversation_receiver.cipher;
+        encrypted_conversation_sender = encrypted_conversation_sender.cipher;
+
+   
 
         //sends the encrypted conversations to the server
-        socket.emit("send_convo", encrypted_conversation1, encrypted_conversation2, username, sender);
+        socket.emit("send_convo", encrypted_conversation_sender, encrypted_conversation_receiver, username, receiver);
     }
 
-    // Logout function
+    // Logout functions
     async function logout() {
         // Redirect to the logout rout
         socket.emit("user_disconnect", Cookies.get("username"), function(response) {

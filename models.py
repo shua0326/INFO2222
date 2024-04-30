@@ -56,6 +56,7 @@ class User(UserMixin, Base):
                         secondary=friends_request,
                         primaryjoin=id == friends_request.c.user_id,
                         secondaryjoin=id == friends_request.c.friend_id)
+    messages = relationship("Message", backref="user")
 
                            
 
@@ -63,9 +64,10 @@ class User(UserMixin, Base):
 
 class Message(Base):
     __tablename__ = 'messages_db'
-    convo_id = Column(Integer, primary_key=True)
-    encryptedconvo1 = Column(String)
-    encryptedconvo2 = Column(String)
+    id = Column(Integer, primary_key=True)
+    convo_id = Column(Integer)
+    user_id = Column(Integer, ForeignKey('user.id'))
+    encrypted_convo = Column(String)
 
 class Staff(Base):
     __tablename__ = 'uni_staff_db'

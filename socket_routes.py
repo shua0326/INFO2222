@@ -109,12 +109,6 @@ def join(sender_name, receiver_name):
     if sender is None:
         return "Unknown sender!"
 
-    if not receiver.is_authenticated:
-        return "Receiver is not authenticated!"
-
-    if not is_user_online(db.get_user_id(receiver_name)):
-        return "User is not online!"
-
     user_id = db.get_user_id(sender_name)
     friends_list = db.get_friends(user_id)
     if receiver_name not in friends_list:
@@ -123,7 +117,7 @@ def join(sender_name, receiver_name):
     #sets room id and convo id
     convo_id = db.generate_convo_id(int(db.get_user_id(sender_name)), int(db.get_user_id(receiver_name)))
 
-    if db.get_convo(convo_id, "encryptedconvo1") is None:
+    if db.get_convo(convo_id, user_id) is None:
         room.join_room(sender_name, convo_id)
         join_room(convo_id)
         #send the corresponding encrypted message to the user
@@ -131,12 +125,8 @@ def join(sender_name, receiver_name):
         return int(convo_id)
 
     #determines which encryptedconvo to send
-    row = ""
-    if int(db.get_user_id(sender_name)) > int(db.get_user_id(receiver_name)):
-        row = "encryptedconvo1"
-    elif int(db.get_user_id(sender_name)) < int(db.get_user_id(receiver_name)):
-        row = "encryptedconvo2"
-    encrypted_message = db.get_convo(convo_id, row)
+
+    encrypted_message = db.get_convo(convo_id, user_id)
 
     #grab the hmac value if a encrypted message is found
     if encrypted_message:
@@ -144,15 +134,19 @@ def join(sender_name, receiver_name):
         join_room(convo_id)
         #send the corresponding encrypted message to the user
         emit("incoming_sys_init", (f"{encrypted_message}"))
+    
         return int(convo_id)
 
 
 @socketio.on("send_convo")
-def send_convo(convo1, convo2, user, sender):
+def send_convo(convo_sender, convo_receiver, user, receiver):
     if not current_user.is_authenticated:
         flask_socketio.disconnect()
-    convo_id = db.generate_convo_id(int(db.get_user_id(user)), int(db.get_user_id(sender)))
-    db.update_convo(convo_id, convo1, convo2)
+    convo_id = db.generate_convo_id(int(db.get_user_id(user)), int(db.get_user_id(receiver)))
+    user_id = db.get_user_id(user)
+    receiver_id = db.get_user_id(receiver)
+    db.update_convo(convo_id, user_id, convo_sender)
+    db.update_convo(convo_id, receiver_id, convo_receiver)
 
 # leave room event handler
 @socketio.on("leave")
