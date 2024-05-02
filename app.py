@@ -195,7 +195,7 @@ def home():
 def articles():
     return render_template('articles.jinja')
 
-# logout function that clears the session
+# logout function that clears the sessions
 @app.route("/logout")
 def logout():
     session.clear()
