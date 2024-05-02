@@ -34,6 +34,7 @@ def connect():
     connected_users[user_id] = True
     emit("init_room_id", room_id)
 
+
 def update_client(user_id):
     if not current_user.is_authenticated:
         flask_socketio.disconnect()
@@ -41,7 +42,8 @@ def update_client(user_id):
     friends = db.get_friends(user_id)
     outgoing = db.get_outgoing_friends_request(user_id)
     incoming = db.get_incoming_friends_request(user_id)
-    emit('update', {'friends': friends, 'outgoing': outgoing, 'incoming': incoming}, to=room_id)
+    group_chats = db.get_group_chats(user_id)
+    emit('update', {'friends': friends, 'outgoing': outgoing, 'incoming': incoming, 'group_chats': group_chats}, to=room_id)
 
 @socketio.on('disconnect')
 def handle_disconnect():
@@ -203,6 +205,13 @@ def remove_request(user, friend):
     db.remove_request(user_id, friend_id)
     update_client(friend_id)
     update_client(user_id)
+    
+@socketio.on('make_group_chat')
+def make_group_chat(user_id, chat_name, users):
+    if not current_user.is_authenticated:
+        flask_socketio.disconnect()
+    db.make_group_chat(user_id, chat_name, users)
+    update_client(user_id)
 
 
 @socketio.on("remove_friend")
@@ -214,3 +223,10 @@ def remove_friend(user, friend):
     db.remove_friend(user_id, friend_id)
     update_client(friend_id)
     update_client(user_id)
+
+@socketio.on("leave_group_chat")
+def leave_group_chat(chat_name):
+    if not current_user.is_authenticated:
+        flask_socketio.disconnect()
+    db.leave_group_chat(current_user.id, chat_name)
+    update_client(current_user.id)

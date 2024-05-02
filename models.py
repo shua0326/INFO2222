@@ -57,10 +57,14 @@ class User(UserMixin, Base):
                         primaryjoin=id == friends_request.c.user_id,
                         secondaryjoin=id == friends_request.c.friend_id)
     messages = relationship("Message", backref="user")
-
-                           
+    
 
 # stateful counter used to generate the room id
+class GroupChat(Base):
+    __tablename__ = 'group_chat_db'
+    chat_id = Column(Integer, primary_key=True)
+    chat_name = Column(String)
+    user_id = Column(Integer, ForeignKey('user.id'))
 
 class Message(Base):
     __tablename__ = 'messages_db'

@@ -17,7 +17,7 @@
         display: flex;
         justify-content: space-between;
         margin: 50px;
-        height: 600px;
+        height: 700px;
     }
 
     .Chat {
@@ -40,10 +40,11 @@
 
     #message_box {
         border: 1px solid #ddd;
-        height: 450px;
-        width: 100%;
+        height: 500px;
+        width: 95%;
         border-radius: 5px;
         justify-self: center;
+        padding: 10px 10px;
     }
 
     .text {
@@ -201,6 +202,8 @@
 
     <div class="Friends" id="Small_box"> </div>
 
+    <div class="Group_chats" id="Small_box"> </div>
+
 </main>
 
 <script src="/static/js/libs/jschmac.bundle.js"></script>
@@ -252,6 +255,7 @@
         updateFriendsList(data.friends);
         updateOutgoingRequests(data.outgoing);
         updateIncomingRequests(data.incoming);
+        updateGroupChats(data.group_chats);
     });
 
     // an incoming message arrives, we'll add the message to the message box
@@ -594,7 +598,6 @@
         if (user_id) {
             socket.emit("add_friend_request", user_id, friend_id);
         }
-
     }
 
     //sends requests to the server for these functionalities
@@ -656,6 +659,80 @@
             });
         }
         container.innerHTML += '<button onclick="add_friend_request()">Add Friend</button>';
+    }
+    
+    function updateGroupChats(chats) {
+        const container = document.querySelector('.Group_chats');
+        container.innerHTML = '<h2>Group Chats</h2>'; 
+        if (!chats.length) {
+            container.innerHTML += '<p>No group chats yet!</p>';
+        } else {
+            chats.forEach(chat => {
+                container.innerHTML += `<div class="button-container">
+                    <button onclick="join_group_chat('${chat}')" class="Friends_button">${chat}</button>
+                    <button onclick="leave_group_chat('${chat}')" class="Cancel_button">Leave Chat</button>
+                </div>`;
+            });
+        }
+        container.innerHTML += '<button onclick="make_group_chat()">Make Group Chat</button>';
+    }
+
+    async function make_group_chat() {
+        let chat_name = prompt("Enter the name of the group chat:");
+        // Check chat name is not taken
+        let chat_names = await fetchchatnames();
+        if (chat_names.includes(chat_name)) {
+            alert("Chat name already taken. Please choose another name.");
+            return;
+        }
+        let users = prompt("Enter all users in the group chat separated by commas:").split(",");
+        chat_name = encodeURI(chat_name);
+        try {
+            user_id = await fetchUserid(username);
+        } catch(error) {
+            console.error("Error in fetching user id:", error);
+        }
+        if (user_id) {
+            socket.emit("make_group_chat", user_id, chat_name, users);
+        }
+    }
+
+    async function fetchchatnames() {
+        try {
+            const response = await fetch(`/api/users/fetchchatnames`, {
+                method: "GET"
+            });
+            const data = await response.json();
+            return data.chat_names;
+        } catch (error) {
+            console.error("Fetching user id failed:", error);
+        }
+    }
+
+    async function join_group_chat(chat_name) {
+        let user_names = await fetchchatusers(chat_name);
+        console.log(user_names);
+        for (i = 0; i < user_names.length; i++) {
+            if (user_names[i] != username) {
+                join_room(user_names[i]);
+            }
+        }
+    }
+
+    async function fetchchatusers(chat_name) {
+        try {
+            const response = await fetch(`/api/users/${chat_name}/fetchchatusers`, {
+                method: "GET"
+            });
+            const data = await response.json();
+            return data.chat_users;
+        } catch (error) {
+            console.error("Fetching user id failed:", error);
+        }
+    }
+
+    function leave_group_chat(chat_name) {
+        socket.emit("leave_group_chat", chat_name);
     }
 
     function remove_friend(friend) {

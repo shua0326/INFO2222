@@ -249,6 +249,53 @@ def check_staff_code(staff_id:int, user_code:str, user_role:str):
             return False
         return True
 
+# class GroupChat(Base):
+#     __tablename__ = 'group_chat_db'
+#     chat_id = Column(Integer, primary_key=True)
+#     chat_name = Column(String)
+#     user_id = Column(Integer, ForeignKey('user.id'))
+
+
+# Get group chats
+def get_group_chats(user_id: int):
+    with Session(engine) as session:
+        group_chats = session.query(GroupChat).filter(GroupChat.user_id == user_id).all()
+        group_chats = [group_chat.chat_name for group_chat in group_chats]
+        return group_chats
+    
+def get_all_group_chats():
+    with Session(engine) as session:
+        group_chats = session.query(GroupChat).all()
+        group_chats = [group_chat.chat_name for group_chat in group_chats]
+        return group_chats
+    
+# Add group chat
+def make_group_chat(user_id:int, chat_name:str, users:list):
+    with Session(engine) as session:
+        group_chat = GroupChat(chat_name=chat_name, user_id=user_id)
+        session.add(group_chat)
+        session.commit()
+        for usernames in users:
+            other_user_id = get_user_id(usernames)            
+            if other_user_id not in [get_user_id(i) for i in get_friends(user_id)]:
+                continue
+            group_chat = GroupChat(chat_name=chat_name, user_id=other_user_id)
+            session.add(group_chat)
+            session.commit()
+            
+def leave_group_chat(user_id:int, chat_name:str):
+    with Session(engine) as session:
+        group_chat = session.query(GroupChat).filter(GroupChat.user_id == user_id, GroupChat.chat_name == chat_name).first()
+        session.delete(group_chat)
+        session.commit()
+        
+def get_group_chat_users(chat_name:str, current_user_id:int):
+    with Session(engine) as session:
+        group_chat = session.query(GroupChat).filter(GroupChat.chat_name == chat_name).all()
+        chat_user_ids = [group_chat.user_id for group_chat in group_chat]
+        chat_user_names = [get_username(i) for i in chat_user_ids if i != current_user_id]
+        return chat_user_names
+        
 # inserts staff to the database
 def insert_staff(id:int, staff_role: str, staff_code: str):
     with Session(engine) as session:
