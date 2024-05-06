@@ -185,8 +185,8 @@
             <input class="receiver" id="message" placeholder="message" oninput="checkInput()">
             <button id="sendButton" onclick="send()" disabled>Send</button>
             <button onclick="leave()">Leave Room</button>
+            <button id="add_friend_button" onclick="add_friend_to_group()" style="display: none">Add friend</button>
         </section>
-
         <style>
             button:disabled {
                 background-color: #010000;
@@ -492,16 +492,17 @@
         return window.jschmac.verify(hmacKey, encodedMessage, mac, "SHA-256");
     }
 
-    function open_chat(friend) {
+    function open_chat(friend, is_group_chat="not_a_goup_chat") {
         leave();
-        join_room(friend);
+        join_room(friend, is_group_chat);
     }
 
     // we emit a join room event to the server to join a room
-    function join_room(friend) {
+    function join_room(friend, is_group_chat) {
+        console.log(is_group_chat)
         current_receiver = friend;  //sets receiver to the friend you clicked on
         //pass in the receiver of our message to the server as well as the current user's username
-        socket.emit("join", username, current_receiver, (res) => {
+        socket.emit("join", username, current_receiver, is_group_chat, (res) => {
 
             // returns an error message if the server returns an error
             if (typeof res != "number") {
@@ -513,6 +514,11 @@
             // now we'll show the input box, so the user can input their message
             document.getElementById("chatting_to").innerHTML = "Chatting to: " + friend;    //updates the chatting to box
             $("#input_box").show();
+            if (is_group_chat == "is_a_group_chat") {
+                $("#add_friend_button").show();
+            } else {
+                $("#add_friend_button").hide();
+            }
         });
 
     }
@@ -669,7 +675,7 @@
         } else {
             chats.forEach(chat => {
                 container.innerHTML += `<div class="button-container">
-                    <button onclick="join_group_chat('${chat}')" class="Friends_button">${chat}</button>
+                    <button onclick="open_chat('${chat}', 'is_a_group_chat')" class="Friends_button">${chat}</button>
                     <button onclick="leave_group_chat('${chat}')" class="Cancel_button">Leave Chat</button>
                 </div>`;
             });
@@ -686,7 +692,6 @@
             return;
         }
         let users = prompt("Enter all users in the group chat separated by commas:").split(",");
-        chat_name = encodeURI(chat_name);
         try {
             user_id = await fetchUserid(username);
         } catch(error) {
@@ -709,26 +714,15 @@
         }
     }
 
-    async function join_group_chat(chat_name) {
-        let user_names = await fetchchatusers(chat_name);
-        console.log(user_names);
-        for (i = 0; i < user_names.length; i++) {
-            if (user_names[i] != username) {
-                join_room(user_names[i]);
-            }
-        }
-    }
-
-    async function fetchchatusers(chat_name) {
+    async function add_friend_to_group() {
+        let friend = prompt("Enter the name of the friend you want to add to the group chat:");
         try {
-            const response = await fetch(`/api/users/${chat_name}/fetchchatusers`, {
-                method: "GET"
-            });
-            const data = await response.json();
-            return data.chat_users;
-        } catch (error) {
-            console.error("Fetching user id failed:", error);
+            friend_id = await fetchUserid(friend);
+        } catch(error) {
+            console.error("Error in fetching user id:", error);
         }
+        convo_id = current_receiver + "-GroupChat"
+        socket.emit("add_friend_to_group", friend_id, convo_id);
     }
 
     function leave_group_chat(chat_name) {

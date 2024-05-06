@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session
 from models import *
 import bcrypt
 from pathlib import Path
+from markupsafe import escape
+from random import randint
 
 # creates the database directory
 Path("database") \
@@ -163,7 +165,7 @@ def update_convo(convo_id, user_id, encrypted_message):
             result.encrypted_convo += "+++" + encrypted_message
         else:
             # If the convo_id and user_id do not exist, insert a new record
-            new_message = Message(convo_id=convo_id, user_id=user_id, encrypted_convo=encrypted_message)
+            new_message = Message(convo_id=convo_id, room_id = convo_id, user_id=user_id, encrypted_convo=encrypted_message)
             session.add(new_message)
         session.commit()
 
@@ -259,42 +261,62 @@ def check_staff_code(staff_id:int, user_code:str, user_role:str):
 # Get group chats
 def get_group_chats(user_id: int):
     with Session(engine) as session:
-        group_chats = session.query(GroupChat).filter(GroupChat.user_id == user_id).all()
-        group_chats = [group_chat.chat_name for group_chat in group_chats]
+        group_chats = session.query(Message).filter(Message.user_id == user_id, Message.convo_id.like("%-GroupChat%")).all()
+        group_chats = [group_chat.convo_id.replace("-GroupChat","") for group_chat in group_chats]
         return group_chats
     
 def get_all_group_chats():
     with Session(engine) as session:
-        group_chats = session.query(GroupChat).all()
-        group_chats = [group_chat.chat_name for group_chat in group_chats]
+        group_chats = session.query(Message).filter(Message.convo_id.like("%-GroupChat%")).all()
+        group_chats = [group_chat.convo_id for group_chat in group_chats]
         return group_chats
-    
+
 # Add group chat
 def make_group_chat(user_id:int, chat_name:str, users:list):
     with Session(engine) as session:
-        group_chat = GroupChat(chat_name=chat_name, user_id=user_id)
+        chat_name = escape(chat_name) + "-GroupChat"
+        random_id = randint(1000000, 9999999)
+        while session.query(Message).filter(Message.room_id == random_id).first() is not None:
+            random_id = randint(1000000, 9999999)
+        
+        group_chat = Message(convo_id=chat_name, user_id=user_id, room_id=random_id)
         session.add(group_chat)
         session.commit()
         for usernames in users:
             other_user_id = get_user_id(usernames)            
             if other_user_id not in [get_user_id(i) for i in get_friends(user_id)]:
                 continue
-            group_chat = GroupChat(chat_name=chat_name, user_id=other_user_id)
+            group_chat = Message(convo_id=chat_name, user_id=other_user_id, room_id=random_id)
             session.add(group_chat)
             session.commit()
             
 def leave_group_chat(user_id:int, chat_name:str):
     with Session(engine) as session:
-        group_chat = session.query(GroupChat).filter(GroupChat.user_id == user_id, GroupChat.chat_name == chat_name).first()
+        chat_name = chat_name + "-GroupChat"
+        group_chat = session.query(Message).filter(Message.user_id == user_id, Message.convo_id == chat_name).first()
         session.delete(group_chat)
         session.commit()
         
-def get_group_chat_users(chat_name:str, current_user_id:int):
+def get_group_chat_users(chat_name:str):
     with Session(engine) as session:
-        group_chat = session.query(GroupChat).filter(GroupChat.chat_name == chat_name).all()
+        chat_name = chat_name + "-GroupChat"
+        group_chat = session.query(Message).filter(Message.convo_id == chat_name).all()
         chat_user_ids = [group_chat.user_id for group_chat in group_chat]
-        chat_user_names = [get_username(i) for i in chat_user_ids if i != current_user_id]
+        chat_user_names = [get_username(i) for i in chat_user_ids]
         return chat_user_names
+    
+def get_room_id(convo_id):
+    with Session(engine) as session:
+        result = session.query(Message).filter(Message.convo_id == convo_id).first()
+        return result.room_id if result else None
+    
+def add_friend_to_group(friend_id, convo_id):
+    with Session(engine) as session:
+        room_id = get_room_id(convo_id)
+        if get_username(friend_id) not in get_group_chat_users(convo_id.replace("-GroupChat","")):
+            group_chat = Message(convo_id=str(convo_id), user_id=friend_id, room_id=room_id)
+            session.add(group_chat)
+            session.commit()
         
 # inserts staff to the database
 def insert_staff(id:int, staff_role: str, staff_code: str):

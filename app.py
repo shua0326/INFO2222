@@ -200,11 +200,6 @@ def fetchchatnames():
     chat_names = db.get_all_group_chats()
     return jsonify({'chat_names': chat_names}), 200
 
-@app.route("/api/users/<string:chat_name>/fetchchatusers", methods=["GET"])
-def fetchchatusers(chat_name):
-    chat_users = db.get_group_chat_users(chat_name, current_user_id=current_user.id)
-    return jsonify({'chat_users': chat_users}), 200
-
 # logout function that clears the sessions
 @app.route("/logout")
 def logout():
