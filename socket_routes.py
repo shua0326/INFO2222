@@ -95,7 +95,7 @@ def send(username, message, mac):
 # join room event handler
 # sent when the user joins a room
 @socketio.on("join")
-def join(sender_name, receiver_name):
+def join(sender_name, receiver_name, is_group_chat):
     #various validation and error checking
     if not current_user.is_authenticated:
         flask_socketio.disconnect()
