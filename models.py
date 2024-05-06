@@ -65,7 +65,8 @@ class User(UserMixin, Base):
 class Message(Base):
     __tablename__ = 'messages_db'
     id = Column(Integer, primary_key=True)
-    convo_id = Column(Integer)
+    convo_id = Column(String)
+    room_id = Column(Integer)
     user_id = Column(Integer, ForeignKey('user.id'))
     encrypted_convo = Column(String)
 
