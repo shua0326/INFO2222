@@ -139,14 +139,17 @@ def join(sender_name, receiver_name):
 
 
 @socketio.on("send_convo")
-def send_convo(convo_sender, convo_receiver, user, receiver):
+def send_convo(encrypted_convo, user, receiver, is_group_chat):
     if not current_user.is_authenticated:
         flask_socketio.disconnect()
-    convo_id = db.generate_convo_id(int(db.get_user_id(user)), int(db.get_user_id(receiver)))
-    user_id = db.get_user_id(user)
-    receiver_id = db.get_user_id(receiver)
-    db.update_convo(convo_id, user_id, convo_sender)
-    db.update_convo(convo_id, receiver_id, convo_receiver)
+    if is_group_chat:
+        convo_id = receiver+"-GroupChat"
+        user_id = db.get_user_id(user)
+        db.update_convo(convo_id, user_id, encrypted_convo)
+    else:
+        convo_id = db.generate_convo_id(int(db.get_user_id(user)), int(db.get_user_id(receiver)))
+        user_id = db.get_user_id(user)
+        db.update_convo(convo_id, user_id, encrypted_convo)
 
 # leave room event handler
 @socketio.on("leave")

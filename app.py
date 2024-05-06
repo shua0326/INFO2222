@@ -195,6 +195,16 @@ def home():
 def articles():
     return render_template('articles.jinja')
 
+@app.route("/api/users/fetchchatnames", methods=["GET"])
+def fetchchatnames():
+    chat_names = db.get_all_group_chats()
+    return jsonify({'chat_names': chat_names}), 200
+
+@app.route("/api/users/<string:chat_name>/fetchchatusernames", methods=["GET"])
+def fetchchatusernames(chat_name):
+    chat_usernames = db.get_group_chat_users(chat_name)
+    return jsonify({'chat_usernames': chat_usernames}), 200
+
 # logout function that clears the sessions
 @app.route("/logout")
 def logout():
