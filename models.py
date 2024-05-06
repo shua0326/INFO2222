@@ -58,14 +58,11 @@ class User(UserMixin, Base):
                         secondaryjoin=id == friends_request.c.friend_id)
     messages = relationship("Message", backref="user")
 
-                           
-
-# stateful counter used to generate the room id
-
 class Message(Base):
     __tablename__ = 'messages_db'
     id = Column(Integer, primary_key=True)
-    convo_id = Column(Integer)
+    convo_id = Column(String)
+    room_id = Column(Integer)
     user_id = Column(Integer, ForeignKey('user.id'))
     encrypted_convo = Column(String)
 
