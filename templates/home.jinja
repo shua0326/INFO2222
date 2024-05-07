@@ -284,6 +284,10 @@
     });
 
     socket.on("incoming_sys_init", async (encrypted_msg, color="black") => {
+
+        console.log(encrypted_msg)
+
+
         
         if (!encrypted_msg) {
             return;
@@ -315,7 +319,7 @@
         //joins the decrypted messages into one string
         let decrypted_convo = '';
         if (decrypted_msgs.length > 0) {
-            decrypted_convo = decrypted_msgs.join("");
+            decrypted_convo = decrypted_msgs.join("\n");
         }
         //conversation history is added to the global conversation
 
@@ -330,7 +334,7 @@
 
 
     window.addEventListener("beforeunload", async function (event) {
-        socket.emit("user_disconnect", Cookies.get("username"));
+        socket.emit("user_disconnect", username);
         await leave();
     });
 
@@ -424,39 +428,38 @@
         $("#message").val("");  // Clear the message input early for a better user experience
         checkInput();
 
+        let formattedMessage = username + ": " + message;
+
         if (is_group_chat) {
-            const response = await fetchchatusernames();
-            const data = await response.json();
-            const chat_users = data
+            const chat_users = await fetchchatusernames();
+            console.log(chat_users);
             for (let user of chat_users) {
-                if (user != Cookies.get("username")) {
-                    try {
-                        //grabs the receiver's public key
-                        const receiverPublicKey = await fetchPublicKey(user);
+                try {
+                    //grabs the receiver's public key
+                    const receiverPublicKey = await fetchPublicKey(user);
 
-                        if (!receiverPublicKey) {
-                            console.error("No public key found for receiver:", user);
-                            alert("Cannot find receiver's public key."); // Notifies the user if the public key is not found
-                            return;  // Exit the function if no public key was fetched
-                        }
-
-                        let formattedMessage = username + ": " + message;   //formats message to include the sender's name
-
-                        await add_message_sys(formattedMessage);
-
-                        let mac = await generate_hmac(formattedMessage);  // Generate HMAC for the actual message to be sent
-                        let encryptedMessage = await encryptMessage(receiverPublicKey, formattedMessage);  // Encrypt the full formatted message
-                        let macbase = arrayBufferToBase64(mac);
-
-                        socket.emit("send", user, encryptedMessage.cipher, macbase);
-                        socket.emit("send_convo", encryptedMessage.cipher, Cookies.get("username"), current_receiver, is_group_chat);
-
-
-
-                    } catch (error) {
-                        console.error("Error in sending message:", error);
-                        alert("Failed to send the message."); // Provide feedback on failure
+                    if (!receiverPublicKey) {
+                        console.error("No public key found for receiver:", user);
+                        alert("Cannot find receiver's public key."); // Notifies the user if the public key is not found
+                        return;  // Exit the function if no public key was fetched
                     }
+
+                       //formats message to include the sender's name
+
+                    let mac = await generate_hmac(formattedMessage);  // Generate HMAC for the actual message to be sent
+                    let encryptedMessage = await encryptMessage(receiverPublicKey, formattedMessage);  // Encrypt the full formatted message
+                    let macbase = arrayBufferToBase64(mac);
+
+                    if (user != username) {
+                        socket.emit("send", user, encryptedMessage.cipher, macbase);
+                    }
+                    socket.emit("send_convo", encryptedMessage.cipher, user, current_receiver, is_group_chat);
+
+
+
+                } catch (error) {
+                    console.error("Error in sending message:", error);
+                    alert("Failed to send the message."); // Provide feedback on failure
                 }
             }
         }
@@ -464,15 +467,14 @@
             try {
                 //grabs the receiver's public key
                 const receiverPublicKey = await fetchPublicKey(receiver);
-                const senderPublicKey = await fetchPublicKey(Cookies.get("username"));
+                console.log(receiverPublicKey);
+                const senderPublicKey = await fetchPublicKey(username);
 
                 if (!receiverPublicKey) {
                     console.error("No public key found for receiver:", receiver);
                     alert("Cannot find receiver's public key."); // Notifies the user if the public key is not found
                     return;  // Exit the function if no public key was fetched
                 }
-
-                let formattedMessage = username + ": " + message;   //formats message to include the sender's name
 
                 await add_message_sys(formattedMessage);
 
@@ -484,8 +486,8 @@
 
                 // Emit the message over the sockets
                 socket.emit("send", receiver, encryptedMessage_receiver.cipher, macbase);
-                socket.emit("send_convo", encryptedMessage_sender.cipher, Cookies.get("username"), current_receiver, is_group_chat);
-                socket.emit("send_convo", encryptedMessage_receiver.cipher, Cookies.get("username"), current_receiver, is_group_chat);
+                socket.emit("send_convo", encryptedMessage_sender.cipher, username, current_receiver, is_group_chat);
+                socket.emit("send_convo", encryptedMessage_receiver.cipher, current_receiver, username, is_group_chat);
 
                 // Add the formatted message to the user's chat window locally for immediate feedback
 
@@ -496,6 +498,7 @@
                 alert("Failed to send the message."); // Provide feedback on failure
             }
         }
+        await add_message_sys(formattedMessage);
     }
 
     // Function to encode strings to Uint8Array
@@ -538,13 +541,14 @@
         return window.jschmac.verify(hmacKey, encodedMessage, mac, "SHA-256");
     }
 
-    function open_chat(friend, is_group_chat="not_a_goup_chat") {
+    function open_chat(friend, group_chat) {
         leave();
-        join_room(friend, is_group_chat);
+        is_group_chat = group_chat;
+        join_room(friend);
     }
 
     // we emit a join room event to the server to join a room
-    function join_room(friend, is_group_chat) {
+    function join_room(friend) {
         console.log(is_group_chat)
         current_receiver = friend;  //sets receiver to the friend you clicked on
         //pass in the receiver of our message to the server as well as the current user's username
@@ -560,14 +564,12 @@
             // now we'll show the input box, so the user can input their message
             document.getElementById("chatting_to").innerHTML = "Chatting to: " + friend;    //updates the chatting to box
             $("#input_box").show();
-            if (is_group_chat == "is_a_group_chat") {
+            if (is_group_chat) {
                 $("#add_friend_button").show();
-                is_group_chat = true;
             } else {
                 $("#add_friend_button").hide();
             }
         });
-
     }
 
     // function when the user clicks on "Leave Room"
@@ -582,8 +584,7 @@
     }
 
     // function to add a message to the message box
-    // called when an incoming message has rea
-    // ched a client
+    // called when an incoming message has reached a client
 
     async function add_message_sys(message, color) {
         let box = $("#message_box");
@@ -632,7 +633,7 @@
     // Logout functions
     async function logout() {
         // Redirect to the logout rout
-        socket.emit("user_disconnect", Cookies.get("username"), function(response) {
+        socket.emit("user_disconnect", username, function(response) {
             if (response) {
                 window.location.href = "/logout";
             }
@@ -707,7 +708,7 @@
         } else {
             friends.forEach(friend => {
                 container.innerHTML += `<div class="button-container">
-                    <button onclick="open_chat('${friend}')" class="Friends_button">${friend}</button>
+                    <button onclick="open_chat('${friend}', false)" class="Friends_button">${friend}</button>
                     <button class="Cancel_button" onclick="remove_friend('${friend}')">Remove</button>
                 </div>`;
             });
@@ -723,7 +724,7 @@
         } else {
             chats.forEach(chat => {
                 container.innerHTML += `<div class="button-container">
-                    <button onclick="open_chat('${chat}', 'is_a_group_chat')" class="Friends_button">${chat}</button>
+                    <button onclick="open_chat('${chat}', true)" class="Friends_button">${chat}</button>
                     <button onclick="leave_group_chat('${chat}')" class="Cancel_button">Leave Chat</button>
                 </div>`;
             });
@@ -734,8 +735,9 @@
     async function make_group_chat() {
         let chat_name = prompt("Enter the name of the group chat:");
         // Check chat name is not taken
-        let chat_names = await fetchchatnames();
-        if (chat_names.includes(chat_name)) {
+        let data = await fetchchatnames();
+        console.log(data);
+        if (data.chat_names.includes(chat_name)) {
             alert("Chat name already taken. Please choose another name.");
             return;
         }

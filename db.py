@@ -162,7 +162,10 @@ def update_convo(convo_id, user_id, encrypted_message):
         result = session.query(Message).filter(Message.convo_id == convo_id, Message.user_id == user_id).one_or_none()
         if result:
             # If the convo_id and user_id exist, update the message, adding the delimiter
-            result.encrypted_convo += "+++" + encrypted_message
+            if result.encrypted_convo:
+                result.encrypted_convo += "+++" + encrypted_message
+            else:
+                result.encrypted_convo = encrypted_message + "+++"
         else:
             # If the convo_id and user_id do not exist, insert a new record
             new_message = Message(convo_id=convo_id, room_id=convo_id, user_id=user_id, encrypted_convo=encrypted_message)
@@ -268,7 +271,7 @@ def get_group_chats(user_id: int):
 def get_all_group_chats():
     with Session(engine) as session:
         group_chats = session.query(Message).filter(Message.convo_id.like("%-GroupChat%")).all()
-        group_chats = [group_chat.convo_id for group_chat in group_chats]
+        group_chats = [group_chat.convo_id.replace("-GroupChat","") for group_chat in group_chats]
         return group_chats
 
 # Add group chat

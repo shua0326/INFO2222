@@ -78,7 +78,7 @@ def login_the_user():
         return "Error: Password does not match!"
     login_user(user)    #authenticates the user, adding them to the connected users
     resp = make_response(url_for('home', username=username))
-    resp.set_cookie('username', username, httponly=True)
+    resp.set_cookie('username', username, httponly=True, samesite="Lax", secure=True)
     return resp
 
 @app.route("/api/users/<string:username>/set_public_key", methods=["PUT"])
@@ -203,6 +203,9 @@ def fetchchatnames():
 @app.route("/api/users/<string:chat_name>/fetchchatusernames", methods=["GET"])
 def fetchchatusernames(chat_name):
     chat_usernames = db.get_group_chat_users(chat_name)
+    print()
+    print(chat_usernames)
+    print()
     return jsonify({'chat_usernames': chat_usernames}), 200
 
 # logout function that clears the sessions

@@ -92,17 +92,12 @@ def send(username, message, mac):
         emit("incoming_sys_disconnect")
         return "You are not friends with this user!"
     room_id = room.get_room_id(username)
-    emit("incoming", (f"{username}", f"{message}", mac), to=room_id, include_self=False)
+    emit("incoming", (f"{username}", f"{message}", mac), to=room_id)
 
 # join room event handler
 # sent when the user joins a room
 @socketio.on("join")
 def join(sender_name, receiver_name, is_group_chat):
-    if is_group_chat == "is_a_group_chat":
-        is_group_chat = True
-    else:
-        is_group_chat = False
-
     # various validation and error checking
     if not current_user.is_authenticated:
         flask_socketio.disconnect()
@@ -136,14 +131,15 @@ def join(sender_name, receiver_name, is_group_chat):
         emit("incoming_sys_init", (""))
         return int(room_id)
 
-    # determines which encryptedconvo to send
     encrypted_message = db.get_convo(convo_id, user_id)
     # grab the hmac value if a encrypted message is found
+
     if encrypted_message:
         room.join_room(sender_name, room_id)
         join_room(room_id)
         # send the corresponding encrypted message to the user
         emit("incoming_sys_init", (f"{encrypted_message}"))
+        print(encrypted_message)
 
         return int(room_id)
 
