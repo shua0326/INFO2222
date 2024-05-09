@@ -79,6 +79,24 @@ class Counter():
     def get(self):
         self.counter -= 1
         return self.counter
+    
+class ArticleComments(Base):
+    __tablename__ = 'article_comments'
+    id = Column(Integer, primary_key=True)
+    article_id = Column(Integer, ForeignKey('articles.id'))
+    user_id = Column(Integer, ForeignKey('user.id'))
+    username = Column(String, ForeignKey('user.username'))
+    time_stamp = Column(String)
+    comment = Column(String)
+    user_role = Column(String, ForeignKey('user.user_role'))
+    
+class Article(Base):
+    __tablename__ = 'articles'
+    id = Column(Integer, primary_key=True)
+    article_title = Column(String)
+    article_author = Column(String)
+
+    
 
 # Room class, used to keep track of which username is in which room
 class Room():
