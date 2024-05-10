@@ -4,13 +4,14 @@ database file, containing all the logic to interface with the sql database
 '''
 
 
-from sqlalchemy import create_engine, update, select, and_
+from sqlalchemy import create_engine, update, select, and_, desc
 from sqlalchemy.orm import Session
 from models import *
 import bcrypt
 from pathlib import Path
 from markupsafe import escape
 from random import randint
+from datetime import datetime
 
 # creates the database directory
 Path("database") \
@@ -327,6 +328,48 @@ def insert_staff(id:int, staff_role: str, staff_code: str):
         staff = Staff(staff_id=id, staff_role=staff_role, staff_code=staff_code)
         session.add(staff)
         session.commit()
+        
+def create_article(title, username):
+    with Session(engine) as session:
+        article = Article(article_title=title, article_author=username)
+        session.add(article)
+        session.commit()
+        
+def remove_article(file):
+    with Session(engine) as session:
+        file = file.replace(".txt", "")
+        article = session.query(Article).filter(Article.article_title == file).first()
+        session.delete(article)
+        session.commit()
+        
+def get_comments(file):
+    with Session(engine) as session:
+        file = file.replace(".txt", "")
+        file_id = session.query(Article).filter(Article.article_title == file).first().id
+        comments = session.query(ArticleComments).filter(ArticleComments.article_id == file_id).order_by(ArticleComments.time_stamp).all()
+        comments = [{"username": comment.username, "time_stamp": comment.time_stamp, "comment": comment.comment, "user_role": comment.user_role, "comment_id": comment.id} for comment in comments]
+        return comments
+
+def add_comment(file, comment, user_id, username, time_stamp, user_role):
+    with Session(engine) as session:
+        file = file.replace(".txt", "")
+        article = session.query(Article).filter(Article.article_title == file).first()
+        comment = ArticleComments(article_id=article.id, user_id=user_id, username=username, time_stamp=time_stamp, comment=comment, user_role=user_role)
+        session.add(comment)
+        session.commit()
+        
+def remove_comment(comment_id):
+    with Session(engine) as session:
+        comment = session.query(ArticleComments).filter(ArticleComments.id == comment_id).first()
+        session.delete(comment)
+        session.commit()
+        
+def get_file_author(file):
+    with Session(engine) as session:
+        file = file.replace(".txt", "")
+        article = session.query(Article).filter(Article.article_title == file).first()
+        author = article.article_author
+        return author
 
 try:
     insert_staff(2, "Administrative staff", hash("2"))

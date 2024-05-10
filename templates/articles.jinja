@@ -1,3 +1,521 @@
-{% for line in text_lines %}
-{{ line }}
-{% endfor %}
+<!--
+    Here you'll find the main exhibit: the chat application code. Feel free to look around!
+-->
+
+{% block content %} 
+<style>
+
+    body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        background-color: darkblue;
+    }
+
+    .main {
+        display: flex;
+        justify-content: space-between;
+        margin: 50px;
+        height: 900px;
+    }
+
+    .text {
+        margin: 5px 0;
+    }
+
+    nav {
+        display: flex;
+        justify-content: space-between;
+        background-color: #333;
+        color: #fff;
+        padding: 0.2em 1em;
+        font-size: 1.5em;
+        text-align: center;
+    }
+
+    button {
+        background-color: #f44336;
+        border: none;
+        color: white;
+        padding: 10px 10px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 16px;
+        cursor: pointer;
+        border-radius: 4px;
+    }
+
+    button:hover {
+        background-color: #d32f2f;
+        color: #fff;
+    }
+
+    h1 {
+        text-align: left;
+        color: white;
+        margin: 20px 0;
+        margin-left: 70px;
+    }
+
+    nav ol li {
+        display: inline-block;
+        margin-right: 20px;
+
+    }
+
+    .button-container {
+        display: block;
+        margin: 10px 0;
+    }
+
+    a {
+        background-color: #f44336;
+        border: none;
+        color: white;
+        padding: 10px 10px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 16px;
+        cursor: pointer;
+        border-radius: 4px;
+    }
+    
+    a:hover {
+        background-color: #d32f2f;
+    }
+
+    .article_container {
+        flex: 4; /* Takes up 3/4 of the space */
+        margin: 0px 30px;
+        background-color: #fff;
+        padding: 30px 30px;
+        border-radius: 10px;
+        box-shadow: 0px 0px 5px 0px rgba(0,0,0,0.15);
+    }
+
+    .comments_container {
+        flex: 2;
+        margin: 0px 30px;
+        background-color: #fff;
+        padding: 30px 30px;
+        border-radius: 10px;
+        box-shadow: 0px 0px 5px 0px rgba(0,0,0,0.15);
+    }
+
+    #file_content {
+        border: 1px solid black;
+        padding: 10px;
+        margin: 10px 0px;
+        height: 705px;
+        overflow: auto;
+        border-radius: 10px;
+        margin-right: 10px;
+    }
+
+    #comment_content {
+        border: 1px solid black;
+        padding: 10px;
+        margin: 10px 0px;
+        height: 705px;
+        overflow: auto;
+        border-radius: 10px;
+    }
+
+    #new_comment {
+        font-size: 16px;
+        padding: 10px;
+    }
+
+    #commentDiv > div > div {
+        display: inline-block;
+    }
+
+    .inline_block {
+        display: inline-block;
+        font-size: 20px;
+        margin-right: 10px;
+    }
+
+    #protected-content {
+        display: hidden;
+    }
+
+    #file {
+        font-size: 13px;
+        padding: 5px;
+    
+    }
+
+</style>
+
+<nav>
+    <h1>Articles</h1>
+    <ol>
+        <li><b>Username:</b>  {{ username }} - {{user_role}}</li>
+        <li><button onclick="(async () => { await logout(); })()">Logout</button></li>
+        <li><a href={{ url_for('home') }}>Chat</a></li>
+    </ol>
+</nav>
+
+<main class="main">
+    <div class="article_container">
+        <div class="inline_block">
+            <label for="file"><strong>Selected Article:</strong></label>
+            <select id="file" name="file" required>
+                <option value="">Select a file</option>
+                {% for file in files %}
+                    <option value="{{ file }}">{{ file }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="inline_block">
+            <p><strong>Author:</strong> <span id="file-author"></span></p>
+        </div>
+
+        <div id="file_content" contenteditable="true"></div>    
+        <div class="inline_block">
+            <button id="create_article_button">Create Article</button>
+        </div>
+        <div class="inline_block">
+            <div id="protected-content">
+                <div class="inline_block">
+                    <button id="save-button">Save</button>
+                </div>
+                <button id="delete_article_button">Delete Current Article</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="comments_container"> 
+        <h2>Comments</h2>
+        
+        <div id="comment_content"></div>
+
+        <div class="button-container">
+            <input type="text" id="new_comment" name="new_comment" required>
+            <button id="add_comment_button">Add Comment</button>
+        </div>
+    </div>
+
+</main>
+
+<script>
+
+
+        
+    document.getElementById('file').addEventListener('change', function() {
+        var selectedFile = this.value;
+        if (selectedFile) {
+            fetch('/get_file_content', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: 'file=' + encodeURIComponent(selectedFile)
+            })
+            .then(response => response.json())
+            .then(data => {
+                var contentWithLineBreaks = data.content.replace(/\n/g, '<br>');
+                document.getElementById('file_content').innerHTML = contentWithLineBreaks;
+            });
+        } else {
+            document.getElementById('file_content').textContent = '';
+        }
+    });
+
+    function createArticle() {
+        var title = prompt("Enter the title of the new article:");
+        var content = prompt("Enter the content of the new article:");
+        
+        fetch('/create_article', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: 'title=' + encodeURIComponent(title) + '&content=' + encodeURIComponent(content)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Article created successfully!');
+                fetchFiles();
+            } else {
+                alert('Failed to create article.');
+            }
+        });
+    }
+
+    function fetchFiles() {
+        fetch('/get_files')
+        .then(response => response.json())
+        .then(data => {
+            var fileDropdown = document.getElementById('file');
+            fileDropdown.innerHTML = '';
+            data.files.forEach(file => {
+                var option = document.createElement('option');
+                option.value = file;
+                option.textContent = file;
+                fileDropdown.appendChild(option);
+            });
+            var event = new Event('change');
+            fileDropdown.dispatchEvent(event);
+        });
+    }
+
+    function deleteArticle() {
+        var fileDropdown = document.getElementById('file');
+        var selectedFile = fileDropdown.value;
+        if (!selectedFile) {
+            alert('No file selected.');
+            return;
+        }
+
+        fetch('/delete_article', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: 'file=' + encodeURIComponent(selectedFile)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Article deleted successfully!');
+                fetchFiles();
+            } else {
+                alert('Failed to delete article.');
+            }
+        });
+    }
+
+
+    document.getElementById('add_comment_button').addEventListener('click', function() {
+        var newComment = document.getElementById('new_comment').value;
+        var fileDropdown = document.getElementById('file');
+        var selectedFile = fileDropdown.value;
+        if (!newComment || !selectedFile) {
+            alert('No comment or file selected.');
+            return;
+        }
+
+        fetch('/add_comment', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: 'file=' + encodeURIComponent(selectedFile) + '&comment=' + encodeURIComponent(newComment)
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(data => {
+            // Clear the comment input field
+            document.getElementById('new_comment').value = '';
+
+            // Fetch the updated comments
+            fetch_comments(selectedFile);
+        })
+        .catch((error) => {
+            console.error('Error:', error);
+        });
+    });
+
+    // Fetch comments for the initially selected file
+    window.onload = function() {
+        fetchFiles();
+
+        var fileDropdown = document.getElementById('file');
+        var username = "{{ username }}"; // Assuming username is passed from the server
+
+        if (fileDropdown) {
+            fileDropdown.addEventListener('change', function() {
+                var selectedFile = this.value;
+                get_file_author(selectedFile).then(fileAuthor => {
+                    document.getElementById('file-author').textContent = fileAuthor;
+
+                    // Show or hide protected content based on author
+                    var protectedContent = document.getElementById('protected-content');
+                    if (fileAuthor === username || "{{ user_role }}" !== 'Student') {
+                        protectedContent.style.display = 'block';
+                    } else {
+                        protectedContent.style.display = 'none';
+                    }
+                }).catch(error => {
+                    console.error('Error:', error);
+                });
+            });
+        }
+    
+        var fileDropdown = document.getElementById('file');
+        if (fileDropdown) {
+            fileDropdown.addEventListener('change', function() {
+                var selectedFile = this.value;
+                fetch_comments();
+                get_file_author(selectedFile).then(fileAuthor => {
+                    document.getElementById('file-author').textContent = fileAuthor;
+                }).catch(error => {
+                    console.error('Error:', error);
+                });
+            });
+            // Call fetch_comments and get_file_author once initially for the default selected file
+            var selectedFile = fileDropdown.value;
+            fetch_comments();
+            get_file_author(selectedFile).then(fileAuthor => {
+                document.getElementById('file-author').textContent = fileAuthor;
+            }).catch(error => {
+                console.error('Error:', error);
+            });
+        }
+    
+        var deleteButton = document.getElementById('delete_article_button');
+        if (deleteButton) {
+            deleteButton.addEventListener('click', deleteArticle);
+        }
+    
+        var createButton = document.getElementById('create_article_button');
+        if (createButton) {
+            createButton.addEventListener('click', createArticle);
+        }
+    };
+
+    function get_file_author(file) {
+        return fetch('/get_author', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: 'file=' + encodeURIComponent(file)
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(data => data.author);
+    }
+    
+    function fetch_comments() {
+        var file = document.getElementById('file').value;
+        fetch('/get_comments?file=' + encodeURIComponent(file))
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(data => {
+            let commentContent = document.getElementById('comment_content');
+            if (commentContent) {
+                commentContent.innerHTML = ''; 
+                data.comments.forEach(comment => {
+                    let commentDiv = document.createElement('div');
+                
+                    let commentInfoWrapper = document.createElement('div');
+                    commentInfoWrapper.style.display = 'flex';
+                    commentInfoWrapper.style.justifyContent = 'space-between';
+                
+                    let comment_info = document.createElement('div');
+                    comment_info.innerHTML = "<strong>" + comment.username + ' - ' +  comment.user_role + ' - ' + comment.time_stamp + ":</strong>";
+                    commentInfoWrapper.appendChild(comment_info);
+                
+                    let username = "{{ username }}";
+                    if (comment.username === username || "{{ user_role }}" !== 'Student') {
+                        let deleteButton = document.createElement('button');
+                        deleteButton.textContent = 'Remove Comment';
+                        deleteButton.style.backgroundColor = '#f44336'; // Red
+                        deleteButton.style.color = 'white'; // White text
+                        deleteButton.style.border = 'none'; // No border
+                        deleteButton.style.cursor = 'pointer'; // Cursor changes to hand icon on hover
+                        deleteButton.style.padding = '5px 5px'; // Padding
+                        deleteButton.style.textAlign = 'center'; // Centered text
+                        deleteButton.style.textDecoration = 'none'; // No underline
+                        deleteButton.style.display = 'inline-block'; // Display as inline-block
+                        deleteButton.style.fontSize = '13px'; // Text size
+                        deleteButton.style.margin = '4px 2px'; // Margin
+                        deleteButton.style.transitionDuration = '0.4s'; // Transition duration for hover effect
+
+                        deleteButton.onmouseover = function() {
+                            this.style.backgroundColor = 'white';
+                            this.style.color = '#d32f2f';
+                        }
+                        deleteButton.onmouseout = function() {
+                            this.style.backgroundColor = '#d32f2f';
+                            this.style.color = 'white';
+                        }
+
+                        deleteButton.addEventListener('click', function() {
+                            fetch('/delete_comment', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/x-www-form-urlencoded'
+                                },
+                                body: 'file=' + encodeURIComponent(file) + '&comment_id=' + encodeURIComponent(comment.comment_id)
+                            })
+                            .then(response => {
+                                if (!response.ok) {
+                                    throw new Error('Network response was not ok');
+                                }
+                                return response.json();
+                            })
+                            .then(data => {
+                                fetch_comments();
+                            })
+                            .catch((error) => {
+                                console.error('Error:', error);
+                            });
+                        });
+                        commentInfoWrapper.appendChild(deleteButton);
+                    }
+                    commentDiv.appendChild(commentInfoWrapper);
+
+                    let commentTextDiv = document.createElement('div');
+                    commentTextDiv.textContent = comment.comment;
+                    commentDiv.appendChild(commentTextDiv);
+                
+                    let breakLine = document.createElement('br');
+                    commentContent.appendChild(breakLine);
+                
+                    commentContent.appendChild(commentDiv);
+                });
+            }
+        })
+        .catch((error) => {
+            console.error('Error:', error);
+        });
+    }
+
+    document.getElementById('save-button').addEventListener('click', function() {
+        let fileContent = document.getElementById('file_content').innerText;
+        let file = document.getElementById('file').value;
+        fetch('/save_file', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: 'file=' + encodeURIComponent(file) + '&content=' + encodeURIComponent(fileContent)
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('File saved successfully');
+        })
+        .catch((error) => {
+            console.error('Error:', error);
+        });
+    });
+
+
+
+
+</script>
+{% endblock %}

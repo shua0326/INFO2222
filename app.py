@@ -11,6 +11,8 @@ from flask_login import LoginManager, current_user, login_user
 from flask_socketio import SocketIO
 import db
 import secrets
+import os
+from datetime import datetime
 
 # import logging
 # this turns off Flask Logging, uncomment this to turn off Logging
@@ -193,7 +195,82 @@ def home():
 
 @app.route('/articles')
 def articles():
-    return render_template('articles.jinja')
+    files = os.listdir('templates/Articles')
+    username = current_user.username
+    user_id = db.get_user_id(username)
+    user_role = db.get_user_role(user_id)
+    return render_template('articles.jinja', username=username, user_role=user_role, files=files, user_id=user_id)
+
+@app.route('/get_file_content', methods=['POST'])
+def get_file_content():
+    filename = request.form.get('file')
+
+    if not filename:
+        return jsonify(success=False)
+
+    try:
+        with open('templates/Articles/' + filename, 'r') as file:
+            content = file.read()
+    except FileNotFoundError:
+        return jsonify(success=False, error='File not found')
+
+    return jsonify(success=True, content=content)
+
+@app.route('/create_article', methods=['POST'])
+def create_article():
+    title = request.form.get('title')
+    content = request.form.get('content')
+    db.create_article(title, current_user.username)
+    if not title or not content:
+        return jsonify(success=False)
+    with open(os.path.join('templates/Articles', title + '.txt'), 'w') as f:
+        f.write(content)
+    return jsonify(success=True)
+
+@app.route('/delete_article', methods=['POST'])
+def delete_article():
+    file = request.form.get('file')
+    if not file:
+        return jsonify(success=False)
+    try:
+        os.remove(os.path.join('templates/Articles', file))
+        db.remove_article(file)
+    except OSError:
+        return jsonify(success=False)
+
+    return jsonify(success=True)
+
+@app.route('/get_author', methods=['POST'])
+def get_file_author():
+    file = request.form.get('file')
+    print()
+    print(file)
+    print()
+    author = db.get_file_author(file)
+    return jsonify({'author': author}), 200
+
+@app.route('/get_files')
+def get_files():
+    files = os.listdir('templates/Articles')
+    return jsonify(files=files)
+
+@app.route('/get_comments', methods=['GET'])
+def get_comments():
+    file = request.args.get('file') 
+    if not file:
+        return jsonify({'error': 'No file specified'}), 400
+    comments = db.get_comments(file)
+    return jsonify(comments=comments)
+
+
+@app.route('/add_comment', methods=['POST'])
+def add_comment():
+    file = request.form.get('file')
+    comment = request.form.get('comment')
+    if not file or not comment:
+        return jsonify({'error': 'No file or comment specified'}), 400    
+    db.add_comment(file, comment, current_user.id, current_user.username, datetime.now().strftime('%H:%M:%S'), current_user.user_role)
+    return jsonify({'message': 'Comment added successfully'})
 
 @app.route("/api/users/fetchchatnames", methods=["GET"])
 def fetchchatnames():
@@ -213,6 +290,21 @@ def fetchchatusernames(chat_name):
 def logout():
     session.clear()
     return redirect(url_for('index'))
+
+@app.route('/delete_comment', methods=['POST'])
+def delete_comment():
+    comment_id = request.form.get('comment_id')
+    db.remove_comment(comment_id)
+    # After deleting the comment, you can return a success message.
+    return jsonify({'message': 'Comment deleted successfully'}), 200
+
+@app.route('/save_file', methods=['POST'])
+def save_file():
+    file = request.form.get('file')
+    content = request.form.get('content')
+    with open("templates/Articles/" + file, 'w') as f:
+        f.write(content)
+    return jsonify({'message': 'File saved successfully'}), 200
 
 if __name__ == '__main__':
     socketio.run(app)
