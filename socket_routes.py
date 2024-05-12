@@ -3,6 +3,7 @@ socket_routes
 file containing all the routes related to socket.io
 '''
 import flask_socketio
+from flask import request
 from flask_socketio import join_room, emit, leave_room
 from flask_login import current_user, AnonymousUserMixin
 
@@ -31,8 +32,21 @@ def connect():
     room.join_room(username, room_id)
     join_room(room_id)
     update_client(user_id)
-    connected_users[user_id] = True
+    sid = request.sid
+    connected_users[user_id] = sid
+    friends_to_be_notified = db.get_friends(user_id)
+    for friend in friends_to_be_notified:
+        f_id = db.get_user_id(friend)
+        if not is_user_online(f_id):
+            continue
+        update_client(f_id)
     emit("init_room_id", room_id)
+
+def get_userid_from_connectedusers(dictionary, target_value):
+    for key, value in dictionary.items():
+        if value == target_value:
+            return key
+    return None
 
 
 def update_client(user_id):
@@ -47,14 +61,18 @@ def update_client(user_id):
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    for user_id in connected_users:
-        if not db.get_user(db.get_username(user_id)).is_anonymous:
-            del connected_users[user_id]
-            room.leave_room(db.get_username(user_id))
+    sid = str(request.sid)
+    user_id = get_userid_from_connectedusers(connected_users, sid)
+    if user_id is not None and not db.get_user(db.get_username(user_id)).is_anonymous:
+        del connected_users[user_id]
+        room.leave_room(db.get_username(user_id))
+        friends_to_be_notified = db.get_friends(user_id)
+        for friend in friends_to_be_notified:
+            f_id = db.get_user_id(friend)
+            if not is_user_online(f_id):
+                continue
+            update_client(f_id)
 
-
-# event when client disconnects
-# quite unreliable use sparingly
 @socketio.on('user_disconnect')
 def disconnect(given_username):
     if given_username:
@@ -64,12 +82,6 @@ def disconnect(given_username):
     room_id = room.get_room_id(username)
     if room_id is None or username is None:
         return
-    conversation_to_be_disconnected = db.get_to_disconnect_convos(db.get_user_id(username))
-    for user_id in conversation_to_be_disconnected:
-        if not is_user_online(int(user_id)):
-            continue
-        if conversation_to_be_disconnected[user_id] == room.get_room_id(db.get_username(user_id)):
-            emit("incoming_sys_disconnect", to=room.get_room_id(db.get_username(user_id)), include_self=False)
     del connected_users[db.get_user_id(username)]
     leave_room(room_id)
     room.leave_room(username)
@@ -77,7 +89,10 @@ def disconnect(given_username):
 
 
 def is_user_online(user_id):
-    return connected_users.get(user_id, False)
+    if user_id in connected_users:
+        return True
+    else:
+        return False
 
 # send message event handler
 @socketio.on("send")

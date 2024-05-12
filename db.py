@@ -181,15 +181,6 @@ def get_convo(convo_id, user_id):
             return result.encrypted_convo
         else:
             return None
-        
-# Disconnect convo function
-def get_to_disconnect_convos(user_id):
-    with Session(engine) as session:
-        user_id_str = str(user_id)
-        convos_to_be_disconnected = session.query(Message.convo_id).filter(Message.convo_id.like(f"%{user_id_str}%")).all()
-        # Create a dictionary where the keys are the convo_ids with the user_id removed and the values are the original convo_ids
-        convos_dict = {str(convo[0]).replace(user_id_str, ''): str(convo[0]) for convo in convos_to_be_disconnected}
-        return convos_dict
 
 # Generate convo id function
 def generate_convo_id(user_id1, user_id2):

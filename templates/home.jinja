@@ -103,6 +103,14 @@
         margin: 10px 0;
     }
 
+    .online-dot {
+        height: 10px;
+        width: 10px;
+        background-color: #4CAF50; /* green */
+        border-radius: 50%;
+        display: inline-block;
+    }
+
     .List_friend_button {
         background-color: white;
         color: black;
@@ -331,13 +339,6 @@
             leave();
             console.error("Your friend has disconnected.");
         })
-
-
-    window.addEventListener("beforeunload", async function (event) {
-        socket.emit("user_disconnect", username);
-        await leave();
-    });
-
 
 
     async function encryptMessage(publicKey, message) {
@@ -700,18 +701,33 @@
         }
     }
 
-    function updateFriendsList(friends) {
+    async function getonlinestatus(friend) {
+        try {
+            const response = await fetch(`/api/users/${friend}/getonlinestatus`, {
+                method: "GET"
+            });
+            const data = await response.json();
+            return data.online_status;
+        } catch (error) {
+            console.error("Fetching user id failed:", error);
+        }
+    }
+
+    async function updateFriendsList(friends) {
         const container = document.querySelector('.Friends');
         container.innerHTML = '<h2>Friends List</h2>';  // Clear content and add header
         if (!friends.length) {
             container.innerHTML += '<p>No friends yet!</p>';
         } else {
-            friends.forEach(friend => {
+            for (let friend of friends) {
+                let online_status = await getonlinestatus(friend);
+                let onlineDot = online_status ? '<span class="online-dot"></span>' : '';
                 container.innerHTML += `<div class="button-container">
-                    <button onclick="open_chat('${friend}', false)" class="Friends_button">${friend}</button>
-                    <button class="Cancel_button" onclick="remove_friend('${friend}')">Remove</button>
-                </div>`;
-            });
+                ${onlineDot}
+                <button onclick="open_chat('${friend}', false)" class="Friends_button">${friend}</button>
+                <button class="Cancel_button" onclick="remove_friend('${friend}')">Remove</button>
+            </div>`;
+            }
         }
         container.innerHTML += '<button onclick="add_friend_request()">Add Friend</button>';
     }

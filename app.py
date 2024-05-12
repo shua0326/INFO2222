@@ -129,6 +129,15 @@ def get_user_id(username):
     # Return the public key in the expected field 'pubkey'
     return jsonify({'user_id': user_id}), 200
 
+@app.route("/api/users/<string:friend>/getonlinestatus", methods=["GET"])
+def get_online_status(friend):
+    user_id = db.get_user_id(friend)
+    if not user_id:
+        return jsonify({'error': 'User not found'}), 404
+
+    online_status = socket_routes.is_user_online(user_id)
+    return jsonify({'online_status': online_status}), 200
+
 # handles a get request to the signup page
 @app.route("/signup")
 def signup():
