@@ -46,6 +46,7 @@ class User(UserMixin, Base):
     password: Mapped[str] = mapped_column(String)
     pubkey: Mapped[str] = Column(String)
     user_role: Mapped[str] = Column(String)
+    is_muted = Column(Integer) # 0 = not muted, 1 = muted
 
     friends = relationship("User",
                            secondary=friends_association,

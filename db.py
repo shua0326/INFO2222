@@ -322,6 +322,9 @@ def insert_staff(id:int, staff_role: str, staff_code: str):
         
 def create_article(title, username):
     with Session(engine) as session:
+        muted_status = session.query(User).filter(User.username == username).first().is_muted
+        if muted_status == 1:
+            return "You are muted!"
         article = Article(article_title=title, article_author=username)
         session.add(article)
         session.commit()
@@ -343,6 +346,9 @@ def get_comments(file):
 
 def add_comment(file, comment, user_id, username, time_stamp, user_role):
     with Session(engine) as session:
+        muted_status = session.query(User).filter(User.id == user_id).first().is_muted
+        if muted_status == 1:
+            return "You are muted!"
         file = file.replace(".txt", "")
         article = session.query(Article).filter(Article.article_title == file).first()
         comment = ArticleComments(article_id=article.id, user_id=user_id, username=username, time_stamp=time_stamp, comment=comment, user_role=user_role)
@@ -355,12 +361,29 @@ def remove_comment(comment_id):
         session.delete(comment)
         session.commit()
         
+def mute_user(user_id_to_mute):
+    with Session(engine) as session:
+        user = session.query(User).filter(User.id == user_id_to_mute).first()
+        user.is_muted = 1
+        session.commit()
+        
+def unmute_user(user_id_to_unmute):
+    with Session(engine) as session:
+        user = session.query(User).filter(User.id == user_id_to_unmute).first()
+        user.is_muted = 0
+        session.commit()
+        
 def get_file_author(file):
     with Session(engine) as session:
         file = file.replace(".txt", "")
         article = session.query(Article).filter(Article.article_title == file).first()
         author = article.article_author
         return author
+
+def get_muted_status(user_id):
+    with Session(engine) as session:
+        user = session.query(User).filter(User.id == user_id).first()
+        return user.is_muted
 
 try:
     insert_staff(2, "Administrative staff", hash("2"))

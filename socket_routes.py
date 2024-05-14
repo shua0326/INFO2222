@@ -268,3 +268,23 @@ def add_friend_to_group(friend_id, convo_id):
         flask_socketio.disconnect()
     db.add_friend_to_group(friend_id, convo_id)
     update_client(current_user.id)
+    
+    
+@socketio.on("mute_user")
+def mute_user(target_username, mute_type):
+    if not current_user.is_authenticated:
+        flask_socketio.disconnect()
+    target_user_id = db.get_user_id(target_username)
+    if target_user_id is None:
+        return "User does not exist!"
+    elif target_user_id == current_user.id:
+        return "You cannot mute yourself!"
+    else:
+        if mute_type == "unmute":
+            db.unmute_user(target_user_id)
+            update_client(current_user.id)
+            return "User unmuted!"
+        else:
+            db.mute_user(target_user_id)
+            update_client(current_user.id)
+            return "User muted!"
