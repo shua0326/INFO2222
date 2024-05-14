@@ -80,7 +80,7 @@ def login_the_user():
         return "Error: Password does not match!"
     login_user(user)    #authenticates the user, adding them to the connected users
     resp = make_response(url_for('home', username=username))
-    resp.set_cookie('username', username, httponly=True)
+    resp.set_cookie('username', username, httponly=True, samesite="Lax", secure=True)
     return resp
 
 @app.route("/api/users/<string:username>/set_public_key", methods=["PUT"])
@@ -128,6 +128,15 @@ def get_user_id(username):
 
     # Return the public key in the expected field 'pubkey'
     return jsonify({'user_id': user_id}), 200
+
+@app.route("/api/users/<string:friend>/getonlinestatus", methods=["GET"])
+def get_online_status(friend):
+    user_id = db.get_user_id(friend)
+    if not user_id:
+        return jsonify({'error': 'User not found'}), 404
+
+    online_status = socket_routes.is_user_online(user_id)
+    return jsonify({'online_status': online_status}), 200
 
 # handles a get request to the signup page
 @app.route("/signup")
@@ -276,6 +285,14 @@ def add_comment():
 def fetchchatnames():
     chat_names = db.get_all_group_chats()
     return jsonify({'chat_names': chat_names}), 200
+
+@app.route("/api/users/<string:chat_name>/fetchchatusernames", methods=["GET"])
+def fetchchatusernames(chat_name):
+    chat_usernames = db.get_group_chat_users(chat_name)
+    print()
+    print(chat_usernames)
+    print()
+    return jsonify({'chat_usernames': chat_usernames}), 200
 
 # logout function that clears the sessions
 @app.route("/logout")

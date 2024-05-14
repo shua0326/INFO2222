@@ -3,6 +3,7 @@ socket_routes
 file containing all the routes related to socket.io
 '''
 import flask_socketio
+from flask import request
 from flask_socketio import join_room, emit, leave_room
 from flask_login import current_user, AnonymousUserMixin
 
@@ -31,8 +32,21 @@ def connect():
     room.join_room(username, room_id)
     join_room(room_id)
     update_client(user_id)
-    connected_users[user_id] = True
+    sid = request.sid
+    connected_users[user_id] = sid
+    friends_to_be_notified = db.get_friends(user_id)
+    for friend in friends_to_be_notified:
+        f_id = db.get_user_id(friend)
+        if not is_user_online(f_id):
+            continue
+        update_client(f_id)
     emit("init_room_id", room_id)
+
+def get_userid_from_connectedusers(dictionary, target_value):
+    for key, value in dictionary.items():
+        if value == target_value:
+            return key
+    return None
 
 
 def update_client(user_id):
@@ -47,14 +61,18 @@ def update_client(user_id):
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    for user_id in connected_users:
-        if not db.get_user(db.get_username(user_id)).is_anonymous:
-            del connected_users[user_id]
-            room.leave_room(db.get_username(user_id))
+    sid = str(request.sid)
+    user_id = get_userid_from_connectedusers(connected_users, sid)
+    if user_id is not None and not db.get_user(db.get_username(user_id)).is_anonymous:
+        del connected_users[user_id]
+        room.leave_room(db.get_username(user_id))
+        friends_to_be_notified = db.get_friends(user_id)
+        for friend in friends_to_be_notified:
+            f_id = db.get_user_id(friend)
+            if not is_user_online(f_id):
+                continue
+            update_client(f_id)
 
-
-# event when client disconnects
-# quite unreliable use sparingly
 @socketio.on('user_disconnect')
 def disconnect(given_username):
     if given_username:
@@ -64,12 +82,6 @@ def disconnect(given_username):
     room_id = room.get_room_id(username)
     if room_id is None or username is None:
         return
-    conversation_to_be_disconnected = db.get_to_disconnect_convos(db.get_user_id(username))
-    for user_id in conversation_to_be_disconnected:
-        if not is_user_online(int(user_id)):
-            continue
-        if conversation_to_be_disconnected[user_id] == room.get_room_id(db.get_username(user_id)):
-            emit("incoming_sys_disconnect", to=room.get_room_id(db.get_username(user_id)), include_self=False)
     del connected_users[db.get_user_id(username)]
     leave_room(room_id)
     room.leave_room(username)
@@ -77,7 +89,10 @@ def disconnect(given_username):
 
 
 def is_user_online(user_id):
-    return connected_users.get(user_id, False)
+    if user_id in connected_users:
+        return True
+    else:
+        return False
 
 # send message event handler
 @socketio.on("send")
@@ -92,18 +107,13 @@ def send(username, message, mac):
         emit("incoming_sys_disconnect")
         return "You are not friends with this user!"
     room_id = room.get_room_id(username)
-    emit("incoming", (f"{username}", f"{message}", mac), to=room_id, include_self=False)
+    emit("incoming", (f"{username}", f"{message}", mac), to=room_id)
 
 # join room event handler
 # sent when the user joins a room
 @socketio.on("join")
 def join(sender_name, receiver_name, is_group_chat):
-    if is_group_chat == "is_a_group_chat":
-        is_group_chat = True
-    else:
-        is_group_chat = False
-        
-    #various validation and error checking
+    # various validation and error checking
     if not current_user.is_authenticated:
         flask_socketio.disconnect()
     if not is_group_chat:
@@ -123,41 +133,44 @@ def join(sender_name, receiver_name, is_group_chat):
         friends_list = db.get_friends(user_id)
         if receiver_name not in friends_list:
             return "You are not friends with this user!"
-    #sets room id and convo id
+    # sets room id and convo id
     if is_group_chat:
-        convo_id = receiver_name+"-GroupChat"
+        convo_id = receiver_name + "-GroupChat"
         room_id = db.get_room_id(convo_id)
     else:
         convo_id = db.generate_convo_id(int(db.get_user_id(sender_name)), int(db.get_user_id(receiver_name)))
         room_id = convo_id
-    
     if db.get_convo(convo_id, user_id) is None:
         room.join_room(sender_name, room_id)
         join_room(room_id)
         emit("incoming_sys_init", (""))
         return int(room_id)
-    
-    #determines which encryptedconvo to send
+
     encrypted_message = db.get_convo(convo_id, user_id)
-    #grab the hmac value if a encrypted message is found
+    # grab the hmac value if a encrypted message is found
+
     if encrypted_message:
         room.join_room(sender_name, room_id)
         join_room(room_id)
-        #send the corresponding encrypted message to the user
+        # send the corresponding encrypted message to the user
         emit("incoming_sys_init", (f"{encrypted_message}"))
-    
+        print(encrypted_message)
+
         return int(room_id)
 
 
 @socketio.on("send_convo")
-def send_convo(convo_sender, convo_receiver, user, receiver):
+def send_convo(encrypted_convo, user, receiver, is_group_chat):
     if not current_user.is_authenticated:
         flask_socketio.disconnect()
-    convo_id = db.generate_convo_id(int(db.get_user_id(user)), int(db.get_user_id(receiver)))
-    user_id = db.get_user_id(user)
-    receiver_id = db.get_user_id(receiver)
-    db.update_convo(convo_id, user_id, convo_sender)
-    db.update_convo(convo_id, receiver_id, convo_receiver)
+    if is_group_chat:
+        convo_id = receiver+"-GroupChat"
+        user_id = db.get_user_id(user)
+        db.update_convo(convo_id, user_id, encrypted_convo)
+    else:
+        convo_id = db.generate_convo_id(int(db.get_user_id(user)), int(db.get_user_id(receiver)))
+        user_id = db.get_user_id(user)
+        db.update_convo(convo_id, user_id, encrypted_convo)
 
 # leave room event handler
 @socketio.on("leave")
@@ -232,13 +245,23 @@ def remove_friend(user, friend):
     update_client(friend_id)
     update_client(user_id)
 
+
+@socketio.on('make_group_chat')
+def make_group_chat(user_id, chat_name, users):
+    if not current_user.is_authenticated:
+        flask_socketio.disconnect()
+    db.make_group_chat(user_id, chat_name, users)
+    update_client(user_id)
+
+
 @socketio.on("leave_group_chat")
 def leave_group_chat(chat_name):
     if not current_user.is_authenticated:
         flask_socketio.disconnect()
     db.leave_group_chat(current_user.id, chat_name)
     update_client(current_user.id)
-    
+
+
 @socketio.on("add_friend_to_group")
 def add_friend_to_group(friend_id, convo_id):
     if not current_user.is_authenticated:
