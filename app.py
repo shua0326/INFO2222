@@ -297,10 +297,12 @@ def fetchchatnames():
 @app.route("/api/users/<string:chat_name>/fetchchatusernames", methods=["GET"])
 def fetchchatusernames(chat_name):
     chat_usernames = db.get_group_chat_users(chat_name)
-    print()
-    print(chat_usernames)
-    print()
     return jsonify({'chat_usernames': chat_usernames}), 200
+
+@app.route("/api/users/<string:chat_name>/fetchchatuserids", methods=["GET"])
+def fetchchatusernames(chat_name):
+    chat_ids = db.get_group_chat_ids(chat_name)
+    return jsonify({'chat_ids': chat_ids}), 200
 
 # logout function that clears the sessions
 @app.route("/logout")

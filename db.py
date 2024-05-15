@@ -299,6 +299,13 @@ def get_group_chat_users(chat_name:str):
         chat_user_ids = [group_chat.user_id for group_chat in group_chat]
         chat_user_names = [get_username(i) for i in chat_user_ids]
         return chat_user_names
+
+def get_group_chat_ids(chat_name:str):
+    with Session(engine) as session:
+        chat_name = chat_name + "-GroupChat"
+        group_chat = session.query(Message).filter(Message.convo_id == chat_name).all()
+        chat_user_ids = [group_chat.user_id for group_chat in group_chat]
+        return chat_user_ids
     
 def get_room_id(convo_id):
     with Session(engine) as session:

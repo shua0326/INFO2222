@@ -100,6 +100,10 @@ def send(username, message, mac):
     if not current_user.is_authenticated:
         return "User not authenticated!"
         flask_socketio.disconnect()
+    muted_status = db.get_muted_status(current_user.id)
+    if muted_status:
+        emit("incoming_sys_disconnect")
+        return {"error_message": "You are muted from talking in group chats! Please seek assistance from your teacher or admin!", "error_code": 302}
     if not is_user_online(db.get_user_id(username)):
         return False
     friends_list = db.get_friends(db.get_user_id(current_user.username))
@@ -119,20 +123,23 @@ def join(sender_name, receiver_name, is_group_chat):
     if not is_group_chat:
         receiver = db.get_user(receiver_name)
         if receiver is None:
-            return "Unknown receiver!"
+            return {"error_message": "Unknown receiver!", "error_code": 300}
 
     sender = db.get_user(sender_name)
     if sender is None:
-        return "Unknown sender!"
+        return {"error_message": "Unknown sender!", "error_code": 301}
     
     user_id = db.get_user_id(sender_name)
     if is_group_chat:
+        muted_status = db.get_muted_status(user_id)
+        if muted_status:
+            return {"error_message": "You are muted from talking in group chats! Please seek assistance from your teacher or admin!", "error_code": 302}
         if sender_name not in db.get_group_chat_users(receiver_name):
             return "You are not in this group chat!"
     else:
         friends_list = db.get_friends(user_id)
         if receiver_name not in friends_list:
-            return "You are not friends with this user!"
+            return {"error_message": "You are not friends with this user!", "error_code": 303}
     # sets room id and convo id
     if is_group_chat:
         convo_id = receiver_name + "-GroupChat"
