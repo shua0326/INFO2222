@@ -181,6 +181,10 @@
         <li><b>Username:</b>  {{ username }} - {{user_role}}</li>
         <li><button onclick="(async () => { await logout(); })()">Logout</button></li>
         <li><a href={{ url_for('articles') }}>Articles</a></li>
+        {% if user_role == "Student" %}
+            <li><button onclick="(async () => { mute_user('mute'); })()">Mute User</button></li>
+            <li><button onclick="(async () => { mute_user('unmute'); })()">Unmute User</button></li>
+        {% endif %}
     </ol>
 </nav>
 
@@ -811,5 +815,22 @@
     function remove_friend(friend) {
         socket.emit("remove_friend", username, friend);
     }
+
+    function mute_user(mute_type) {
+        if (mute_type === 'mute') {
+            var mute_type = 'mute';
+            var user_to_mute = prompt("Enter the username of the user you would like to mute:");
+        } else {
+            var mute_type = 'unmute';
+            var user_to_mute = prompt("Enter the username of the user you would like to unmute:");
+        }
+        if (user_to_mute) {
+            socket.emit('mute_user', user_to_mute, mute_type, function(response) {
+                alert(response);
+            });
+        }
+    }
+
+
 </script>
 {% endblock %}

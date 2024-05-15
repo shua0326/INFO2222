@@ -156,6 +156,10 @@
         <li><b>Username:</b>  {{ username }} - {{user_role}}</li>
         <li><button onclick="(async () => { await logout(); })()">Logout</button></li>
         <li><a href={{ url_for('home') }}>Chat</a></li>
+        {% if user_role == "Student" %}
+            <li><button onclick="(async () => { mute_user('mute'); })()">Mute User</button></li>
+            <li><button onclick="(async () => { mute_user('unmute'); })()">Unmute User</button></li>
+        {% endif %}
     </ol>
 </nav>
 
@@ -201,10 +205,12 @@
 
 </main>
 
+<script src="/static/js/libs/jschmac.bundle.js"></script>
+<script src="/static/js/libs/socket.io.min.js"></script>
 <script>
 
+    const socket = io();
 
-        
     document.getElementById('file').addEventListener('change', function() {
         var selectedFile = this.value;
         if (selectedFile) {
@@ -227,7 +233,7 @@
 
     function createArticle() {
         var title = prompt("Enter the title of the new article:");
-        var content = prompt("Enter the content of the new article:");
+        var content = prompt("Enter some content for the new article:");
         
         fetch('/create_article', {
             method: 'POST',
@@ -239,19 +245,20 @@
         .then(response => response.json())
         .then(data => {
             if (data.success) {
+                fetchFiles(title);
                 alert('Article created successfully!');
-                fetchFiles();
             } else {
                 alert('Failed to create article.');
             }
         });
     }
 
-    function fetchFiles() {
+    function fetchFiles(title) {
         fetch('/get_files')
         .then(response => response.json())
         .then(data => {
             var fileDropdown = document.getElementById('file');
+            var oldfile = fileDropdown.value;
             fileDropdown.innerHTML = '';
             data.files.forEach(file => {
                 var option = document.createElement('option');
@@ -259,6 +266,12 @@
                 option.textContent = file;
                 fileDropdown.appendChild(option);
             });
+            if (title) {
+                fileDropdown.value = title+'.txt';
+            }
+            else {
+                fileDropdown.value = oldfile;
+            }
             var event = new Event('change');
             fileDropdown.dispatchEvent(event);
         });
@@ -437,7 +450,7 @@
                         deleteButton.style.textDecoration = 'none'; // No underline
                         deleteButton.style.display = 'inline-block'; // Display as inline-block
                         deleteButton.style.fontSize = '13px'; // Text size
-                        deleteButton.style.margin = '4px 2px'; // Margin
+                        deleteButton.style.margin = '1px 1px'; // Margin
                         deleteButton.style.transitionDuration = '0.4s'; // Transition duration for hover effect
 
                         deleteButton.onmouseover = function() {
@@ -514,8 +527,36 @@
         });
     });
 
+    socket.on('update_articles', function(data) {
+        fetch_comments();
+        fetchFiles();
+    });
 
+    function mute_user(mute_type) {
+        if (mute_type === 'mute') {
+            var mute_type = 'mute';
+            var user_to_mute = prompt("Enter the username of the user you would like to mute:");
+        } else {
+            var mute_type = 'unmute';
+            var user_to_mute = prompt("Enter the username of the user you would like to unmute:");
+        }
+        if (user_to_mute) {
+            socket.emit('mute_user', user_to_mute, mute_type, function(response) {
+                alert(response);
+            });
+        }
+    }
 
+    // Logout functions
+    async function logout() {
+        // Redirect to the logout rout
+        var username = "{{ username }}";
+        socket.emit("user_disconnect", username, function(response) {
+            if (response) {
+                window.location.href = "/logout";
+            }
+        });
+    }
 
 </script>
 {% endblock %}

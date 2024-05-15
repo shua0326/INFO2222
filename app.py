@@ -229,11 +229,14 @@ def get_file_content():
 def create_article():
     title = request.form.get('title')
     content = request.form.get('content')
+    if db.get_muted_status(current_user.id) == 1:
+        return jsonify({'message': 'You are muted and cannot create new articles'}), 200
     db.create_article(title, current_user.username)
     if not title or not content:
         return jsonify(success=False)
     with open(os.path.join('templates/Articles', title + '.txt'), 'w') as f:
         f.write(content)
+    socketio.emit('update_articles')
     return jsonify(success=True)
 
 @app.route('/delete_article', methods=['POST'])
@@ -246,7 +249,7 @@ def delete_article():
         db.remove_article(file)
     except OSError:
         return jsonify(success=False)
-
+    socketio.emit('update_articles')
     return jsonify(success=True)
 
 @app.route('/get_author', methods=['POST'])
@@ -277,8 +280,13 @@ def add_comment():
     file = request.form.get('file')
     comment = request.form.get('comment')
     if not file or not comment:
-        return jsonify({'error': 'No file or comment specified'}), 400    
-    db.add_comment(file, comment, current_user.id, current_user.username, datetime.now().strftime('%H:%M:%S'), current_user.user_role)
+        return jsonify({'error': 'No file or comment specified'}), 400
+    if db.get_muted_status(current_user.id) == 1:
+        print("\nYou are muted and cannot comment\n")
+        print(db.get_muted_status(current_user.id))
+        return jsonify({'message': 'You are muted and cannot comment'}), 200
+    db.add_comment(file, comment, current_user.id, current_user.username, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), current_user.user_role)
+    socketio.emit('update_articles')
     return jsonify({'message': 'Comment added successfully'})
 
 @app.route("/api/users/fetchchatnames", methods=["GET"])
@@ -305,14 +313,18 @@ def delete_comment():
     comment_id = request.form.get('comment_id')
     db.remove_comment(comment_id)
     # After deleting the comment, you can return a success message.
+    socketio.emit('update_articles')
     return jsonify({'message': 'Comment deleted successfully'}), 200
 
 @app.route('/save_file', methods=['POST'])
 def save_file():
     file = request.form.get('file')
     content = request.form.get('content')
+    if db.get_muted_status(current_user.id) == 1:
+        return jsonify({'message': 'You are muted and cannot edit files'}), 200
     with open("templates/Articles/" + file, 'w') as f:
         f.write(content)
+    socketio.emit('update_articles')
     return jsonify({'message': 'File saved successfully'}), 200
 
 if __name__ == '__main__':
