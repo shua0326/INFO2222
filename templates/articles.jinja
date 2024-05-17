@@ -166,6 +166,15 @@
 <main class="main">
     <div class="article_container">
         <div class="inline_block">
+            <label for="course"><strong>Filter by unit:</strong></label>
+            <select id="course" name="course">
+                <option value="">All units</option>
+                {% for course in courses %}
+                    <option value="{{ course }}">{{ course }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="inline_block">
             <label for="file"><strong>Selected Article:</strong></label>
             <select id="file" name="file" required>
                 <option value="">Select a file</option>
@@ -178,14 +187,15 @@
             <p><strong>Author:</strong> <span id="file-author"></span></p>
         </div>
 
-        <div id="file_content" contenteditable="true"></div>    
+        <div id="file_content" contenteditable="false"></div>
         <div class="inline_block">
             <button id="create_article_button">Create Article</button>
         </div>
         <div class="inline_block">
             <div id="protected-content">
                 <div class="inline_block">
-                    <button id="save-button">Save</button>
+                    <button id="edit_button">Edit</button>
+                    <button id="save-button" style="display: none;">Save</button>
                 </div>
                 <button id="delete_article_button">Delete Current Article</button>
             </div>
@@ -211,6 +221,12 @@
 
     const socket = io();
 
+    document.getElementById('course').addEventListener('change', function() {
+        document.getElementById('file-author').textContent = '';
+        var selectedCourse = this.value;
+        fetchFiles(selectedCourse);
+    });
+
     document.getElementById('file').addEventListener('change', function() {
         var selectedFile = this.value;
         if (selectedFile) {
@@ -231,21 +247,40 @@
         }
     });
 
+    document.getElementById('edit_button').addEventListener('click', function() {
+        this.style.display = 'none'; // hide edit button
+        document.getElementById('save-button').style.display = 'inline-block'; // show save button
+        document.getElementById('file_content').setAttribute('contenteditable', 'true');
+    });
+
+    document.getElementById('save-button').addEventListener('click', function() {
+        this.style.display = 'none'; // hide save button
+        document.getElementById('edit_button').style.display = 'inline-block'; // show edit button
+        document.getElementById('file_content').setAttribute('contenteditable', 'false');
+        // rest of your save button code...
+    });
+
     function createArticle() {
         var title = prompt("Enter the title of the new article:");
+        var course = prompt("Enter the unit code the new article is related to (leave blank if the article is not related to a course:");
         var content = prompt("Enter some content for the new article:");
+
+        if (!course) {
+            course = "General";
+        }
         
         fetch('/create_article', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded'
             },
-            body: 'title=' + encodeURIComponent(title) + '&content=' + encodeURIComponent(content)
+            body: 'title=' + encodeURIComponent(title) + '&course=' + encodeURIComponent(course) + '&content=' + encodeURIComponent(content)
         })
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                fetchFiles(title);
+                fetchCourses();
+                fetchFiles(course, title);
                 alert('Article created successfully!');
             } else {
                 alert('Failed to create article.');
@@ -253,28 +288,53 @@
         });
     }
 
-    function fetchFiles(title) {
-        fetch('/get_files')
-        .then(response => response.json())
-        .then(data => {
-            var fileDropdown = document.getElementById('file');
-            var oldfile = fileDropdown.value;
-            fileDropdown.innerHTML = '';
-            data.files.forEach(file => {
-                var option = document.createElement('option');
-                option.value = file;
-                option.textContent = file;
-                fileDropdown.appendChild(option);
+    function fetchCourses() {
+        fetch('/get_courses')
+            .then(response => response.json())
+            .then(data => {
+                var courseDropdown = document.getElementById('course');
+                var oldCourse = courseDropdown.value;
+                courseDropdown.innerHTML = '';
+                var allCoursesOption = document.createElement('option');
+                allCoursesOption.value = '';
+                allCoursesOption.textContent = 'All units';
+                courseDropdown.appendChild(allCoursesOption);
+                data.courses.forEach(course => {
+                    var option = document.createElement('option');
+                    option.value = course;
+                    option.textContent = course;
+                    courseDropdown.appendChild(option);
+                });
+                if (oldCourse) {
+                    courseDropdown.value = oldCourse;
+                }
+                var event = new Event('change');
+                courseDropdown.dispatchEvent(event);
             });
-            if (title) {
-                fileDropdown.value = title+'.txt';
-            }
-            else {
-                fileDropdown.value = oldfile;
-            }
-            var event = new Event('change');
-            fileDropdown.dispatchEvent(event);
-        });
+    }
+
+    function fetchFiles(course, title) {
+        fetch('/get_files?course=' + encodeURIComponent(course))
+            .then(response => response.json())
+            .then(data => {
+                var fileDropdown = document.getElementById('file');
+                var oldfile = fileDropdown.value;
+                fileDropdown.innerHTML = '';
+                data.files.forEach(file => {
+                    var option = document.createElement('option');
+                    option.value = file;
+                    option.textContent = file;
+                    fileDropdown.appendChild(option);
+                });
+                if (title) {
+                    fileDropdown.value = title+'.txt';
+                }
+                else {
+                    fileDropdown.value = oldfile;
+                }
+                var event = new Event('change');
+                fileDropdown.dispatchEvent(event);
+            });
     }
 
     function deleteArticle() {
@@ -296,7 +356,9 @@
         .then(data => {
             if (data.success) {
                 alert('Article deleted successfully!');
-                fetchFiles();
+                fetchCourses();
+                var selectedCourse = document.getElementById('course').value;
+                fetchFiles(selectedCourse);
             } else {
                 alert('Failed to delete article.');
             }
@@ -340,7 +402,9 @@
 
     // Fetch comments for the initially selected file
     window.onload = function() {
-        fetchFiles();
+        fetchCourses();
+        var selectedCourse = document.getElementById('course').value;
+        fetchFiles(selectedCourse);
 
         var fileDropdown = document.getElementById('file');
         var username = "{{ username }}"; // Assuming username is passed from the server
@@ -529,7 +593,9 @@
 
     socket.on('update_articles', function(data) {
         fetch_comments();
-        fetchFiles();
+        fetchCourses();
+        var selectedCourse = document.getElementById('course').value;
+        fetchFiles(selectedCourse);
     });
 
     function mute_user(mute_type) {
