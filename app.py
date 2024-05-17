@@ -203,6 +203,7 @@ def home():
 
 
 @app.route('/articles')
+@login_required
 def articles():
     files = os.listdir('templates/Articles')
     username = current_user.username
