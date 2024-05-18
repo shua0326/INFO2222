@@ -299,6 +299,13 @@ def get_group_chat_users(chat_name:str):
         chat_user_ids = [group_chat.user_id for group_chat in group_chat]
         chat_user_names = [get_username(i) for i in chat_user_ids]
         return chat_user_names
+
+def get_group_chat_ids(chat_name:str):
+    with Session(engine) as session:
+        chat_name = chat_name + "-GroupChat"
+        group_chat = session.query(Message).filter(Message.convo_id == chat_name).all()
+        chat_user_ids = [group_chat.user_id for group_chat in group_chat]
+        return chat_user_ids
     
 def get_room_id(convo_id):
     with Session(engine) as session:
@@ -320,12 +327,14 @@ def insert_staff(id:int, staff_role: str, staff_code: str):
         session.add(staff)
         session.commit()
         
-def create_article(title, username):
+def create_article(title, course, username):
     with Session(engine) as session:
         muted_status = session.query(User).filter(User.username == username).first().is_muted
         if muted_status == 1:
             return "You are muted!"
-        article = Article(article_title=title, article_author=username)
+        if course != "General":
+            course = course.upper()
+        article = Article(article_title=title, article_course=course, article_author=username)
         session.add(article)
         session.commit()
         
@@ -343,6 +352,23 @@ def get_comments(file):
         comments = session.query(ArticleComments).filter(ArticleComments.article_id == file_id).order_by(ArticleComments.time_stamp).all()
         comments = [{"username": comment.username, "time_stamp": comment.time_stamp, "comment": comment.comment, "user_role": comment.user_role, "comment_id": comment.id} for comment in comments]
         return comments
+
+def get_courses():
+    with (Session(engine) as session):
+        courses = session.query(Article.article_course).all()
+        courses = [course[0] for course in courses]
+        courses.sort()
+        return courses
+
+def get_filtered_files(course):
+    with Session(engine) as session:
+        # Query the Article table and filter by the course
+        if course:
+            articles = session.query(Article).filter(Article.article_course == course).all()
+        else:
+            articles = session.query(Article).all()
+        files = [article.article_title + '.txt' for article in articles]
+        return files
 
 def add_comment(file, comment, user_id, username, time_stamp, user_role):
     with Session(engine) as session:

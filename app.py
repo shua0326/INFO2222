@@ -203,6 +203,7 @@ def home():
 
 
 @app.route('/articles')
+@login_required
 def articles():
     files = os.listdir('templates/Articles')
     username = current_user.username
@@ -228,11 +229,12 @@ def get_file_content():
 @app.route('/create_article', methods=['POST'])
 def create_article():
     title = request.form.get('title')
+    course = request.form.get('course')
     content = request.form.get('content')
     if db.get_muted_status(current_user.id) == 1:
         return jsonify({'message': 'You are muted and cannot create new articles'}), 200
-    db.create_article(title, current_user.username)
-    if not title or not content:
+    db.create_article(title, course, current_user.username)
+    if not title or not content or not course:
         return jsonify(success=False)
     with open(os.path.join('templates/Articles', title + '.txt'), 'w') as f:
         f.write(content)
@@ -263,8 +265,17 @@ def get_file_author():
 
 @app.route('/get_files')
 def get_files():
-    files = os.listdir('templates/Articles')
+    course = request.args.get('course')
+    print()
+    print(course)
+    print()
+    files = db.get_filtered_files(course)
     return jsonify(files=files)
+
+@app.route('/get_courses')
+def get_courses():
+    courses = db.get_courses()
+    return jsonify(courses=courses)
 
 @app.route('/get_comments', methods=['GET'])
 def get_comments():
@@ -297,10 +308,12 @@ def fetchchatnames():
 @app.route("/api/users/<string:chat_name>/fetchchatusernames", methods=["GET"])
 def fetchchatusernames(chat_name):
     chat_usernames = db.get_group_chat_users(chat_name)
-    print()
-    print(chat_usernames)
-    print()
     return jsonify({'chat_usernames': chat_usernames}), 200
+
+@app.route("/api/users/<string:chat_name>/fetchchatuserids", methods=["GET"])
+def fetchchatuserids(chat_name):
+    chat_ids = db.get_group_chat_ids(chat_name)
+    return jsonify({'chat_ids': chat_ids}), 200
 
 # logout function that clears the sessions
 @app.route("/logout")

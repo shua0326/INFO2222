@@ -95,6 +95,7 @@ class Article(Base):
     __tablename__ = 'articles'
     id = Column(Integer, primary_key=True)
     article_title = Column(String)
+    article_course = Column(String)
     article_author = Column(String)
 
     
