@@ -138,6 +138,15 @@ def get_online_status(friend):
     online_status = socket_routes.is_user_online(user_id)
     return jsonify({'online_status': online_status}), 200
 
+@app.route("/api/users/<string:username>/get_user_role", methods=["GET"])
+def get_user_role(username):
+    user_id = db.get_user_id(username)
+    if not user_id:
+        return jsonify({'error': 'User not found'}), 404
+
+    user_role = db.get_user_role(user_id)
+    return jsonify({'user_role': user_role}), 200
+
 # handles a get request to the signup page
 @app.route("/signup")
 def signup():

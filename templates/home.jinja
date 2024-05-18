@@ -725,15 +725,25 @@
         } else {
             for (let friend of friends) {
                 let online_status = await getonlinestatus(friend);
+                console.log(friend, online_status);
+                let friend_role = await fetchUserRole(friend);
                 let onlineDot = online_status ? '<span class="online-dot"></span>' : '';
                 container.innerHTML += `<div class="button-container">
                 ${onlineDot}
-                <button onclick="open_chat('${friend}', false)" class="Friends_button">${friend}</button>
+                <button onclick="open_chat('${friend}', false)" class="Friends_button">${friend} - ${friend_role}</button>
                 <button class="Cancel_button" onclick="remove_friend('${friend}')">Remove</button>
             </div>`;
             }
         }
         container.innerHTML += '<button onclick="add_friend_request()">Add Friend</button>';
+    }
+
+    function fetchUserRole(friend) {
+        return fetch(`/api/users/${friend}/get_user_role`, {
+            method: "GET"
+        }).then(response => response.json())
+        .then(data => data.user_role)
+        .catch(error => console.error("Fetching user role failed:", error));
     }
     
     function updateGroupChats(chats) {
