@@ -181,7 +181,7 @@
         <li><b>Username:</b>  {{ username }} - {{user_role}}</li>
         <li><button onclick="(async () => { await logout(); })()">Logout</button></li>
         <li><a href={{ url_for('articles') }}>Articles</a></li>
-        {% if user_role == "Student" %}
+        {% if user_role != "Student" %}
             <li><button onclick="(async () => { mute_user('mute'); })()">Mute User</button></li>
             <li><button onclick="(async () => { mute_user('unmute'); })()">Unmute User</button></li>
         {% endif %}
