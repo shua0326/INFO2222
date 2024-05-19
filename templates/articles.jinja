@@ -104,6 +104,11 @@
         box-shadow: 0px 0px 5px 0px rgba(0,0,0,0.15);
     }
 
+    ::placeholder { /* Chrome, Firefox, Opera, Safari 10.1+ */
+        color: lightgray;
+        opacity: 1; /* Firefox */
+    }
+
     #file_content {
         border: 1px solid black;
         padding: 10px;
@@ -186,6 +191,7 @@
         <div class="inline_block">
             <p><strong>Author:</strong> <span id="file-author"></span></p>
         </div>
+        <p id="edit-instruction" style="display: none;">Type in the display box to edit article!</p>
 
         <div id="file_content" contenteditable="false"></div>
         <div class="inline_block">
@@ -208,7 +214,7 @@
         <div id="comment_content"></div>
 
         <div class="button-container">
-            <input type="text" id="new_comment" name="new_comment" required>
+            <input type="text" id="new_comment" name="new_comment" placeholder="Enter your comment here..." required>
             <button id="add_comment_button">Add Comment</button>
         </div>
     </div>
@@ -223,11 +229,13 @@
 
     document.getElementById('course').addEventListener('change', function() {
         document.getElementById('file-author').textContent = '';
+        document.getElementById('comment_content').innerHTML = '';
         var selectedCourse = this.value;
         fetchFiles(selectedCourse);
     });
 
     document.getElementById('file').addEventListener('change', function() {
+        document.getElementById('comment_content').innerHTML = '';
         var selectedFile = this.value;
         if (selectedFile) {
             fetch('/get_file_content', {
@@ -251,13 +259,14 @@
         this.style.display = 'none'; // hide edit button
         document.getElementById('save-button').style.display = 'inline-block'; // show save button
         document.getElementById('file_content').setAttribute('contenteditable', 'true');
+        document.getElementById('edit-instruction').style.display = 'block';
     });
 
     document.getElementById('save-button').addEventListener('click', function() {
         this.style.display = 'none'; // hide save button
         document.getElementById('edit_button').style.display = 'inline-block'; // show edit button
         document.getElementById('file_content').setAttribute('contenteditable', 'false');
-        // rest of your save button code...
+        document.getElementById('edit-instruction').style.display = 'none';
     });
 
     function createArticle() {
