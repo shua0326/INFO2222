@@ -130,6 +130,9 @@ def join(sender_name, receiver_name, is_group_chat):
         return {"error_message": "Unknown sender!", "error_code": 301}
     
     user_id = db.get_user_id(sender_name)
+    muted_status = db.get_muted_status(user_id)
+    if muted_status:
+        return {"error_message": "You are muted from talking in group chats! Please seek assistance from your teacher or admin!", "error_code": 302}
     if is_group_chat:
         muted_status = db.get_muted_status(user_id)
         if muted_status:

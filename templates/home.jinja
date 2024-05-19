@@ -51,6 +51,19 @@
         margin: 5px 0;
     }
 
+    ::placeholder { /* Chrome, Firefox, Opera, Safari 10.1+ */
+        color: lightgray;
+        opacity: 1; /* Firefox */
+    }
+
+    :-ms-input-placeholder { /* Internet Explorer 10-11 */
+        color: lightgray;
+    }
+
+    ::-ms-input-placeholder { /* Microsoft Edge */
+        color: lightgray;
+    }
+
     nav {
         display: flex;
         justify-content: space-between;
@@ -194,7 +207,7 @@
         <section id="message_box"></section>
         <section id="input_box" style="display: none" >
             <p class="text">Message: </p>
-            <input class="receiver" id="message" placeholder="message" oninput="checkInput()">
+            <input class="receiver" id="message" placeholder="Enter message here..." oninput="checkInput()">
             <button id="sendButton" onclick="send()" disabled>Send</button>
             <button onclick="leave()">Leave Room</button>
             <button id="add_friend_button" onclick="add_friend_to_group()" style="display: none">Add friend</button>
